@@ -115,7 +115,7 @@ export default function Map({ center, zoom = 15, locations, sosActive }: MapProp
 
     // Center map on latest location
     mapRef.current.setView([latestLocation.latitude, latestLocation.longitude], zoom);
-  }, [locations, sosActive, zoom]);
+  }, [locations, sosActive, zoom, center]);
 
   return (
     <div className={styles.mapWrapper}>

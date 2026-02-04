@@ -56,12 +56,12 @@ export async function POST(request: NextRequest) {
         },
       },
       android: {
-        priority: notification.priority === 'high' ? 'high' as 'high' : 'normal' as 'normal',
-      },
+        priority: notification.priority === 'high' ? 'high' : 'normal',
+      } as const,
       apns: {
         headers: {
           'apns-priority': notification.priority === 'high' ? '10' : '5',
-        },
+        } as const,
       },
     }));
 
