@@ -6,12 +6,12 @@ import { useAuth } from '@/hooks/useAuth';
 import { useLocationSharing } from '@/hooks/useGeolocation';
 import { useSOS } from '@/hooks/useSOS';
 import { useWakeLock } from '@/hooks/useWakeLock';
-import { supabase } from '@/lib/supabase/client';
 import Button from '@/components/Button/Button';
 import StatusIndicator from '@/components/StatusIndicator/StatusIndicator';
 import BatteryIndicator from '@/components/BatteryIndicator/BatteryIndicator';
 import Loading from '@/components/Loading/Loading';
 import styles from './parent.module.css';
+import { prisma } from '@/lib/prisma/client';
 
 export default function ParentPage() {
   const router = useRouter();
@@ -37,8 +37,14 @@ export default function ParentPage() {
   useEffect(() => {
     if (!authLoading && !user) {
       router.push('/auth/login');
-    } else if (user && user.role !== 'parent') {
+    } else if (user && user.role === 'parent') {
+      // Stay on parent page
+    } else if (user && user.role === 'helper') {
       router.push('/helper');
+    } else if (user && (!user.role || (user.role !== 'parent' && user.role !== 'helper'))) {
+      // Unknown role, sign out and redirect to login
+      signOut();
+      router.push('/auth/login');
     }
   }, [user, authLoading, router]);
 
@@ -65,39 +71,40 @@ export default function ParentPage() {
   // Get helper name
   useEffect(() => {
     const fetchHelperName = async () => {
-      if (!user) return;
-
-      const { data } = await supabase
-        .from('relationships')
-        .select('helper:users!relationships_helper_id_fkey(name)')
-        .eq('parent_id', user.id)
-        .limit(1)
-        .single();
-
-      const helperData = data as any;
-      if (helperData && helperData.helper?.name) {
-        setHelperName(helperData.helper.name);
+      if (!user || !user.id) return;
+      try {
+        const res = await fetch(`/api/relationship?parent_id=${user.id}`);
+        const data = await res.json();
+        if (data.helperName) {
+          setHelperName(data.helperName);
+        }
+      } catch (err) {
+        console.error('Failed to fetch helper name:', err);
       }
     };
-
     fetchHelperName();
   }, [user]);
 
   const handleStartSharing = useCallback(() => {
-    if (!user) return;
-
+    if (!user || !user.id) return;
     const success = startSharing(async (position) => {
-      // Save location to database
-      await (supabase.from('location_updates') as any).insert({
-        user_id: user.id,
-        latitude: position.latitude,
-        longitude: position.longitude,
-        accuracy: position.accuracy,
-        battery_level: batteryLevel,
-        is_sharing: true,
-      });
+      try {
+        if (!user?.id) throw new Error('User ID is missing');
+        await prisma.location_updates.create({
+          data: {
+            user_id: user.id,
+            latitude: position.latitude,
+            longitude: position.longitude,
+            accuracy: position.accuracy,
+            battery_level: batteryLevel,
+            is_sharing: true,
+            timestamp: new Date(position.timestamp).toISOString(),
+          },
+        });
+      } catch (err) {
+        console.error('Failed to save location:', err);
+      }
     });
-
     if (success) {
       requestWakeLock();
     }
@@ -148,11 +155,11 @@ export default function ParentPage() {
       <header className={styles.header}>
         <div className={styles.headerTop}>
           <h1 className={styles.title}>Najik</h1>
-          <button onClick={signOut} className={styles.signOutButton}>
+          <button type="button" onClick={() => signOut()} className={styles.signOutButton}>
             Sign Out
           </button>
         </div>
-        <p className={styles.subtitle}>Hello, {user.name}!</p>
+        <p className={styles.subtitle}>Hello, {user?.name}!</p>
       </header>
 
       <main className={styles.main}>

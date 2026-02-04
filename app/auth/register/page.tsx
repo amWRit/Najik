@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase/client';
+import { signIn } from 'next-auth/react';
 import { UserRole } from '@/lib/types/database.types';
 import styles from './auth.module.css';
 
@@ -22,36 +22,24 @@ export default function RegisterPage() {
     setError(null);
 
     try {
-      // Sign up with Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, name, role }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Registration failed');
+
+      // Auto-login after registration
+      const signInRes = await signIn('credentials', {
         email,
         password,
-        options: {
-          data: {
-            name,
-            role,
-          },
-        },
+        redirect: false,
       });
+      if (signInRes?.error) throw new Error(signInRes.error);
 
-      if (authError) throw authError;
-
-      if (authData.user) {
-        // Insert user profile
-        const { error: profileError } = await supabase
-          .from('users')
-          .insert({
-            id: authData.user.id,
-            email,
-            name,
-            role,
-          } as any);
-
-        if (profileError) throw profileError;
-
-        // Redirect based on role
-        router.push(role === 'parent' ? '/parent' : '/helper');
-      }
+      // Redirect based on role
+      router.push(role === 'parent' ? '/parent' : '/helper');
     } catch (err: any) {
       setError(err.message || 'An error occurred during registration');
     } finally {

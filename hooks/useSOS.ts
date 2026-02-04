@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { SOSState } from '@/lib/types/database.types';
-import { supabase } from '@/lib/supabase/client';
+import { prisma } from '@/lib/prisma/client';
 
 const SOS_SOUND_PATH = '/sounds/sos-alarm.mp3';
 
@@ -41,19 +41,16 @@ export function useSOS(userId: string) {
 
   const triggerSOS = useCallback(async (latitude: number, longitude: number) => {
     try {
-      // Create SOS alert in database
-      const { data: alertData, error: alertError } = await (supabase
-        .from('sos_alerts') as any)
-        .insert({
+      // Create SOS alert in database using Prisma
+      const alert = await prisma.sos_alerts.create({
+        data: {
           user_id: userId,
           latitude,
           longitude,
           is_active: true,
-        })
-        .select()
-        .single();
-
-      if (alertError) throw alertError;
+          timestamp: new Date().toISOString(),
+        },
+      });
 
       // Play alarm sound
       const audio = playAlarm();
@@ -64,11 +61,11 @@ export function useSOS(userId: string) {
       // Update state
       setState({
         isActive: true,
-        alertId: alertData.id,
+        alertId: alert.id,
         audio,
       });
 
-      return alertData.id;
+      return alert.id;
     } catch (error) {
       console.error('Error triggering SOS:', error);
       throw error;
@@ -78,11 +75,11 @@ export function useSOS(userId: string) {
   const cancelSOS = useCallback(async () => {
     try {
       if (state.alertId) {
-        // Update SOS alert as inactive
-        await (supabase
-          .from('sos_alerts') as any)
-          .update({ is_active: false })
-          .eq('id', state.alertId);
+        // Update SOS alert as inactive using Prisma
+        await prisma.sos_alerts.update({
+          where: { id: state.alertId },
+          data: { is_active: false },
+        });
       }
 
       // Stop alarm
@@ -108,15 +105,14 @@ export function useSOS(userId: string) {
 
   const acknowledgeSOS = useCallback(async (alertId: string, helperId: string) => {
     try {
-      await (supabase
-        .from('sos_alerts') as any)
-        .update({
+      await prisma.sos_alerts.update({
+        where: { id: alertId },
+        data: {
           is_active: false,
           acknowledged_at: new Date().toISOString(),
           acknowledged_by: helperId,
-        })
-        .eq('id', alertId);
-
+        },
+      });
       return true;
     } catch (error) {
       console.error('Error acknowledging SOS:', error);

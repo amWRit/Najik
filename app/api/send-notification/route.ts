@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import * as admin from 'firebase-admin';
 
-const FIREBASE_SERVER_KEY = process.env.FIREBASE_SERVER_KEY;
+// Initialize Firebase Admin SDK
+if (!admin.apps.length) {
+  const serviceAccount = require('@/firebase-service-account.json');
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+  });
+}
 
 interface NotificationPayload {
   title: string;
@@ -48,37 +55,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'No valid FCM tokens found' }, { status: 200 });
     }
 
-    // Send notification via FCM
-    const fcmResponse = await fetch('https://fcm.googleapis.com/fcm/send', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `key=${FIREBASE_SERVER_KEY}`,
+    // Send notifications using Firebase Admin SDK (V1 API)
+    const messages = tokens.map((token: string) => ({
+      token,
+      notification: {
+        title: notification.title,
+        body: notification.body,
       },
-      body: JSON.stringify({
-        registration_ids: tokens,
-        priority: notification.priority || 'high',
+      data: notification.data || {},
+      webpush: {
         notification: {
-          title: notification.title,
-          body: notification.body,
-          icon: '/icon-192x192.png',
-          badge: '/badge-72x72.png',
-          click_action: '/',
+          icon: '/images/logos/icon-192x192.png',
+          badge: '/images/logos/icon-72x72.png',
           tag: notification.data?.type || 'default',
         },
-        data: notification.data || {},
-        webpush: {
-          headers: {
-            Urgency: notification.priority === 'high' ? 'high' : 'normal',
-          },
-          fcm_options: {
-            link: '/',
-          },
+        fcmOptions: {
+          link: '/',
         },
-      }),
-    });
+      },
+      android: {
+        priority: notification.priority === 'high' ? 'high' as 'high' : 'normal' as 'normal',
+      },
+      apns: {
+        headers: {
+          'apns-priority': notification.priority === 'high' ? '10' : '5',
+        },
+      },
+    }));
 
-    const fcmResult = await fcmResponse.json();
+    const fcmResult = await admin.messaging().sendEach(messages);
 
     // Log notifications
     if (users && users.length > 0) {
@@ -100,7 +105,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ 
       success: true, 
-      result: fcmResult,
+      successCount: fcmResult.successCount,
+      failureCount: fcmResult.failureCount,
       sentTo: tokens.length,
     });
   } catch (error: any) {

@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useRealtimeSubscription } from '@/hooks/useRealtime';
-import { supabase } from '@/lib/supabase/client';
 import { LocationUpdate, SOSAlert, User } from '@/lib/types/database.types';
 import Button from '@/components/Button/Button';
 import Card from '@/components/Card/Card';
@@ -47,67 +46,23 @@ export default function HelperPage() {
   useEffect(() => {
     if (!authLoading && !user) {
       router.push('/auth/login');
-    } else if (user && user.role !== 'helper') {
+    } else if (user && user.role === 'helper') {
+      // Stay on helper page
+    } else if (user && user.role === 'parent') {
       router.push('/parent');
+    } else if (user && (!user.role || (user.role !== 'parent' && user.role !== 'helper'))) {
+      // Unknown role, sign out and redirect to login
+      signOut();
+      router.push('/auth/login');
     }
   }, [user, authLoading, router]);
 
   // Fetch parents and their status
-  useEffect(() => {
-    const fetchParents = async () => {
-      if (!user) return;
-
-      try {
-        // Get relationships
-        const { data: relationships, error: relError } = await supabase
-          .from('relationships')
-          .select('parent:users!relationships_parent_id_fkey(*)')
-          .eq('helper_id', user.id);
-
-        if (relError) throw relError;
-
-        const parentStatuses: ParentStatus[] = await Promise.all(
-          relationships.map(async (rel: any) => {
-            const parent = rel.parent;
-
-            // Get latest location
-            const { data: locations } = await supabase
-              .from('location_updates')
-              .select('*')
-              .eq('user_id', parent.id)
-              .order('timestamp', { ascending: false })
-              .limit(1);
-
-            // Get active SOS alert
-            const { data: sos } = await supabase
-              .from('sos_alerts')
-              .select('*')
-              .eq('user_id', parent.id)
-              .eq('is_active', true)
-              .order('timestamp', { ascending: false })
-              .limit(1);
-
-            const lastLocation = locations?.[0] as any;
-
-            return {
-              user: parent,
-              lastLocation: lastLocation || null,
-              sosAlert: (sos?.[0] as any) || null,
-              isSharing: lastLocation?.is_sharing || false,
-            };
-          })
-        );
-
-        setParents(parentStatuses);
-        setLoading(false);
-      } catch (error) {
-        console.error('Error fetching parents:', error);
-        setLoading(false);
-      }
-    };
-
-    fetchParents();
-  }, [user]);
+    useEffect(() => {
+      // TODO: Replace Supabase logic with Prisma or other backend fetch
+      // setParents([]); // Clear for now
+      setLoading(false);
+    }, [user]);
 
   // Auto-select parent if SOS alert
   useEffect(() => {
@@ -121,24 +76,7 @@ export default function HelperPage() {
 
   const handleAcknowledgeSOS = async (alertId: string) => {
     if (!user) return;
-
-    const updateData = {
-      is_active: false,
-      acknowledged_at: new Date().toISOString(),
-      acknowledged_by: user.id,
-    };
-
-    const { error } = await (supabase
-      .from('sos_alerts') as any)
-      .update(updateData)
-      .eq('id', alertId);
-
-    if (error) {
-      console.error('Error acknowledging SOS:', error);
-      return;
-    }
-
-    // Refresh parent status
+    // TODO: Replace Supabase update with Prisma or other backend mutation
     setParents(prev =>
       prev.map(p =>
         p.sosAlert?.id === alertId

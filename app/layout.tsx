@@ -1,6 +1,8 @@
+
+
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import { PWARegister } from "@/components/PWARegister/PWARegister";
+import ClientLayout from "./client-layout";
 
 export const metadata: Metadata = {
   title: "Najik - Family Location Tracking",
@@ -42,8 +44,7 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
       <body className="antialiased">
-        <PWARegister />
-        {children}
+        <ClientLayout>{children}</ClientLayout>
       </body>
     </html>
   );

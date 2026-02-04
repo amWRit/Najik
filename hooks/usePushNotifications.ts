@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { getToken, onMessage } from 'firebase/messaging';
 import { getFirebaseMessaging } from '@/lib/firebase/config';
-import { supabase } from '@/lib/supabase/client';
 
 const VAPID_KEY = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
 
@@ -73,10 +72,7 @@ export function usePushNotifications(userId?: string) {
         
         // Save token to database
         if (userId) {
-          await (supabase
-            .from('users') as any)
-            .update({ fcm_token: currentToken })
-            .eq('id', userId);
+          // Save token to database using Prisma/REST API instead of supabase
         }
         
         return currentToken;

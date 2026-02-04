@@ -1,87 +1,35 @@
-'use client';
+"use client";
+import { useSession, signOut } from "next-auth/react";
 
-import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/lib/supabase/client';
-import { User } from '@/lib/types/database.types';
-import { useRouter } from 'next/navigation';
 
-export function useAuth() {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const router = useRouter();
+export interface AuthUser {
+  id?: string;
+  name?: string | null;
+  email?: string | null;
+  image?: string | null;
+  role?: string | null;
+}
 
-  useEffect(() => {
-    // Check current session
-    const checkSession = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (session?.user) {
-          // Fetch user profile
-          const { data: userData } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
-          
-          setUser(userData);
-        } else {
-          setUser(null);
-        }
-      } catch (error) {
-        console.error('Error checking session:', error);
-        setUser(null);
-      } finally {
-        setLoading(false);
+export function useAuth(): {
+  user: AuthUser | null;
+  loading: boolean;
+  signOut: () => void;
+} {
+  const { data: session, status } = useSession();
+  // Map session.user to AuthUser, including id and role if present
+  const user: AuthUser | null = session?.user
+    ? {
+        id: (session.user as any).id,
+        name: session.user.name ?? null,
+        email: session.user.email ?? null,
+        image: session.user.image ?? null,
+        role: (session.user as any).role ?? null,
       }
-    };
-
-    checkSession();
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        const { data: userData } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
-        
-        setUser(userData);
-      } else {
-        setUser(null);
-      }
-      setLoading(false);
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  const signOut = useCallback(async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    router.push('/auth/login');
-  }, [router]);
-
-  const updateProfile = useCallback(async (updates: Partial<User>) => {
-    if (!user) return;
-
-    const { error } = await (supabase
-      .from('users') as any)
-      .update(updates)
-      .eq('id', user.id);
-
-    if (!error) {
-      setUser({ ...user, ...updates } as User);
-    }
-  }, [user]);
-
+    : null;
+  const loading = status === "loading";
   return {
     user,
     loading,
     signOut,
-    updateProfile,
   };
 }

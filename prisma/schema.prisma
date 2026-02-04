@@ -1,0 +1,99 @@
+
+// Prisma schema for Najik project (Neon/Postgres)
+// Generated from previous Supabase SQL schema
+generator client {
+	provider = "prisma-client-js"
+}
+
+datasource db {
+	provider = "postgresql"
+}
+
+enum user_role {
+	parent
+	helper
+}
+
+enum notification_type {
+	sos_alert
+	location_sharing_started
+	battery_low
+	geofence_entered
+	geofence_exited
+}
+
+model users {
+	id                   String   @id @db.Uuid
+	email                String   @unique
+	password             String
+	name                 String
+	role                 user_role
+	fcm_token            String?  @db.Text
+	notification_enabled Boolean  @default(true)
+	created_at           DateTime @default(now()) @db.Timestamptz(6)
+	updated_at           DateTime @updatedAt @db.Timestamptz(6)
+	relationships_helper relationships[] @relation("helper")
+	relationships_parent relationships[] @relation("parent")
+	location_updates     location_updates[]
+	sos_alerts           sos_alerts[]
+	notifications_log    notifications_log[]
+	messages_from        messages[] @relation("from_user")
+	messages_to          messages[] @relation("to_user")
+	sos_alerts_acknowledged sos_alerts[] @relation("acknowledged_by")
+}
+
+model relationships {
+	id         String   @id @default(uuid()) @db.Uuid
+	helper_id  String   @db.Uuid
+	parent_id  String   @db.Uuid
+	created_at DateTime @default(now()) @db.Timestamptz(6)
+	helper     users    @relation("helper", fields: [helper_id], references: [id])
+	parent     users    @relation("parent", fields: [parent_id], references: [id])
+	@@unique([helper_id, parent_id])
+}
+
+model location_updates {
+	id            String   @id @default(uuid()) @db.Uuid
+	user_id       String   @db.Uuid
+	latitude      Float
+	longitude     Float
+	accuracy      Float
+	battery_level Int?
+	is_sharing    Boolean  @default(true)
+	timestamp     DateTime @default(now()) @db.Timestamptz(6)
+	user          users    @relation(fields: [user_id], references: [id])
+}
+
+model sos_alerts {
+	id              String   @id @default(uuid()) @db.Uuid
+	user_id         String   @db.Uuid
+	latitude        Float
+	longitude       Float
+	timestamp       DateTime @default(now()) @db.Timestamptz(6)
+	acknowledged_at DateTime?
+	acknowledged_by String?  @db.Uuid
+	is_active       Boolean  @default(true)
+	user            users    @relation(fields: [user_id], references: [id])
+	acknowledged    users?   @relation("acknowledged_by", fields: [acknowledged_by], references: [id])
+}
+
+model notifications_log {
+	id        String            @id @default(uuid()) @db.Uuid
+	user_id   String            @db.Uuid
+	type      notification_type
+	title     String
+	body      String
+	sent_at   DateTime          @default(now()) @db.Timestamptz(6)
+	read_at   DateTime?
+	user      users             @relation(fields: [user_id], references: [id])
+}
+
+model messages {
+	id           String   @id @default(uuid()) @db.Uuid
+	from_user_id String   @db.Uuid
+	to_user_id   String   @db.Uuid
+	message      String
+	created_at   DateTime @default(now()) @db.Timestamptz(6)
+	from_user    users    @relation("from_user", fields: [from_user_id], references: [id])
+	to_user      users    @relation("to_user", fields: [to_user_id], references: [id])
+}
