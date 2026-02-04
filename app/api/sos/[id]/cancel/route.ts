@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma/server';
 
-export async function POST(req: NextRequest, context: { params: { id: string } } | Promise<{ params: { id: string } }>) {
+export async function POST(req: NextRequest, context: { params: { id: string } }) {
   try {
-    // Always await context and params if either is a Promise (Next.js 14+)
-    const awaitedContext = typeof (context as any).then === 'function' ? await context : context;
-    const params = typeof awaitedContext.params?.then === 'function' ? await awaitedContext.params : awaitedContext.params;
-    const alertId = params.id;
+    const alertId = context.params.id;
     if (!alertId) {
       return NextResponse.json({ error: 'Missing alertId' }, { status: 400 });
     }
