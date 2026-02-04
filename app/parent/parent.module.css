@@ -1,0 +1,180 @@
+.container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #e0f2fe 0%, #ddd6fe 100%);
+  padding: 1rem;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.header {
+  background-color: var(--color-card-bg);
+  border-radius: 1.5rem;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.headerTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--color-brand-primary);
+  margin: 0;
+}
+
+.signOutButton {
+  padding: 0.5rem 1rem;
+  background-color: transparent;
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-card-border);
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-height: 44px;
+}
+
+.signOutButton:hover {
+  background-color: var(--color-card-border);
+}
+
+.subtitle {
+  font-size: 1.5rem;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.statusCard {
+  background-color: var(--color-card-bg);
+  border-radius: 1.5rem;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: center;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.batteryContainer {
+  padding-top: 0.5rem;
+}
+
+.errorAlert {
+  background-color: #fee2e2;
+  border: 2px solid #fca5a5;
+  color: #991b1b;
+  padding: 1rem 1.5rem;
+  border-radius: 1rem;
+  font-size: 1.125rem;
+  text-align: center;
+  font-weight: 600;
+}
+
+.buttonGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+  margin-top: 1rem;
+}
+
+.buttonContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.mainButton {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 2rem 1.5rem !important;
+  min-height: 140px !important;
+}
+
+.buttonIcon {
+  font-size: 3rem;
+}
+
+.buttonHint {
+  text-align: center;
+  color: var(--color-text-secondary);
+  font-size: 1rem;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.infoBox {
+  background-color: var(--color-card-bg);
+  border-radius: 1rem;
+  padding: 1rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  font-size: 1rem;
+  color: var(--color-text-secondary);
+  box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.1);
+}
+
+/* Tablet and Desktop - Side by side buttons */
+@media (min-width: 640px) {
+  .buttonGrid {
+    grid-template-columns: 1fr 1fr;
+    max-width: 900px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .container {
+    padding: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .header {
+    padding: 2rem;
+  }
+
+  .title {
+    font-size: 2.5rem;
+  }
+
+  .subtitle {
+    font-size: 1.75rem;
+  }
+}
+
+/* Extra large screens */
+@media (min-width: 1024px) {
+  .mainButton {
+    min-height: 180px !important;
+  }
+
+  .buttonIcon {
+    font-size: 4rem;
+  }
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+  .container {
+    background: linear-gradient(135deg, #1e293b 0%, #312e81 100%);
+  }
+
+  .errorAlert {
+    background-color: #7f1d1d;
+    border-color: #dc2626;
+    color: #fecaca;
+  }
+}

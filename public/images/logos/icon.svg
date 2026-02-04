@@ -1,0 +1,14 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="240" fill="#4A90E2"/>
+  
+  <!-- Location pin shape -->
+  <path d="M256 96C198.144 96 151 143.144 151 201C151 280.5 256 416 256 416C256 416 361 280.5 361 201C361 143.144 313.856 96 256 96Z" fill="white"/>
+  
+  <!-- Heart inside pin -->
+  <path d="M256 240C256 240 226 220 226 200C226 188 234 180 244 180C250 180 256 184 256 184C256 184 262 180 268 180C278 180 286 188 286 200C286 220 256 240 256 240Z" fill="#E74C3C"/>
+  
+  <!-- Inner circle accent -->
+  <circle cx="256" cy="200" r="50" fill="none" stroke="white" stroke-width="4" opacity="0.3"/>
+</svg>
+

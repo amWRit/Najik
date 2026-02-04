@@ -1,0 +1,82 @@
+.indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  min-height: 44px;
+}
+
+.dot {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.text {
+  white-space: nowrap;
+}
+
+/* Status variants */
+.sharing {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.sharing .dot {
+  background-color: #10b981;
+}
+
+.offline {
+  background-color: #f3f4f6;
+  color: #374151;
+}
+
+.offline .dot {
+  background-color: #9ca3af;
+}
+
+.sos {
+  background-color: #fee2e2;
+  color: #991b1b;
+}
+
+.sos .dot {
+  background-color: #dc2626;
+}
+
+/* Pulse animation */
+.pulse .dot {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.1);
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .sharing {
+    background-color: #064e3b;
+    color: #d1fae5;
+  }
+
+  .offline {
+    background-color: #374151;
+    color: #f3f4f6;
+  }
+
+  .sos {
+    background-color: #7f1d1d;
+    color: #fecaca;
+  }
+}

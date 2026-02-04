@@ -1,0 +1,104 @@
+.container {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.battery {
+  display: flex;
+  align-items: center;
+}
+
+.batteryBody {
+  position: relative;
+  border: 2px solid currentColor;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.batteryLevel {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.batteryTip {
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background-color: currentColor;
+}
+
+.text {
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+/* Sizes */
+.small .batteryBody {
+  width: 20px;
+  height: 10px;
+}
+
+.small .batteryTip {
+  height: 6px;
+}
+
+.small .text {
+  font-size: 0.75rem;
+}
+
+.medium .batteryBody {
+  width: 30px;
+  height: 15px;
+}
+
+.medium .batteryTip {
+  height: 9px;
+}
+
+.large .batteryBody {
+  width: 40px;
+  height: 20px;
+}
+
+.large .batteryTip {
+  height: 12px;
+}
+
+.large .text {
+  font-size: 1rem;
+}
+
+/* Status colors */
+.high {
+  color: var(--color-brand-success);
+}
+
+.high .batteryLevel {
+  background-color: var(--color-brand-success);
+}
+
+.medium {
+  color: var(--color-brand-warning);
+}
+
+.medium .batteryLevel {
+  background-color: var(--color-brand-warning);
+}
+
+.low {
+  color: var(--color-brand-danger);
+}
+
+.low .batteryLevel {
+  background-color: var(--color-brand-danger);
+  animation: blink 1s ease-in-out infinite;
+}
+
+@keyframes blink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}

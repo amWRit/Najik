@@ -1,0 +1,31 @@
+.card {
+  background-color: var(--color-card-bg);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  transition: all 0.2s;
+}
+
+.default {
+  border: 1px solid var(--color-card-border);
+}
+
+.elevated {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.outlined {
+  border: 2px solid var(--color-card-border);
+}
+
+.clickable {
+  cursor: pointer;
+}
+
+.clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.clickable:active {
+  transform: translateY(0);
+}

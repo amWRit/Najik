@@ -1,0 +1,187 @@
+.authContainer {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.authCard {
+  width: 100%;
+  max-width: 28rem;
+  background-color: var(--color-card-bg);
+  border-radius: 1.5rem;
+  padding: 2.5rem;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.authTitle {
+  font-size: 2rem;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 0.5rem;
+  color: var(--color-text-primary);
+}
+
+.authSubtitle {
+  text-align: center;
+  color: var(--color-text-secondary);
+  margin-bottom: 2rem;
+}
+
+.errorAlert {
+  background-color: #fee2e2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  margin-bottom: 1.5rem;
+  font-size: 0.875rem;
+}
+
+.authForm {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.label {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--color-text-primary);
+}
+
+.input {
+  padding: 0.75rem 1rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 0.75rem;
+  font-size: 1rem;
+  transition: all 0.2s;
+  background-color: var(--background);
+  color: var(--foreground);
+  min-height: 48px;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--color-brand-primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.roleSelector {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.roleButton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1.5rem 1rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 1rem;
+  background-color: var(--background);
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+  min-height: 140px;
+}
+
+.roleButton:hover {
+  border-color: var(--color-brand-primary);
+  background-color: rgba(79, 70, 229, 0.05);
+}
+
+.roleButtonActive {
+  border-color: var(--color-brand-primary);
+  background-color: rgba(79, 70, 229, 0.1);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.roleIcon {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.roleLabel {
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--color-text-primary);
+  margin-bottom: 0.25rem;
+}
+
+.roleDescription {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+.submitButton {
+  padding: 1rem;
+  background-color: var(--color-brand-primary);
+  color: white;
+  font-weight: 600;
+  font-size: 1rem;
+  border: none;
+  border-radius: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 56px;
+}
+
+.submitButton:hover:not(:disabled) {
+  background-color: #4338ca;
+  transform: translateY(-1px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.submitButton:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.submitButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.authFooter {
+  text-align: center;
+  margin-top: 1.5rem;
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+}
+
+.authLink {
+  color: var(--color-brand-primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.authLink:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 640px) {
+  .authCard {
+    padding: 2rem 1.5rem;
+  }
+
+  .roleSelector {
+    grid-template-columns: 1fr;
+  }
+
+  .roleButton {
+    min-height: 120px;
+  }
+}
