@@ -72,12 +72,9 @@ export default function HelperPage() {
   const { user, loading: authLoading, signOut } = useAuth();
   const [parents, setParents] = useState<ParentStatus[]>([]);
   const [parentLoading, setParentLoading] = useState(true);
-  // Debug: log parentUsers on every render
-  console.debug('parentUsers state:', parentUsers);
 
   // Subscribe to location updates for selected parent
   const locationFilter = selectedParent ? { column: 'user_id', value: selectedParent.id } : undefined;
-  console.debug('Subscribing to location_updates with filter:', locationFilter);
   const { data: locationUpdates } = useRealtimeSubscription<LocationUpdate>(
     'location_updates',
     locationFilter
@@ -149,8 +146,6 @@ export default function HelperPage() {
       lastLocation = latestLocation;
     }
     setLatestLocation(lastLocation);
-    // Debug: log latestLocation
-    console.debug('latestLocation (with fallback):', lastLocation);
     setSelectedParentInfo({
       user: selectedParent,
       lastLocation,
@@ -159,9 +154,6 @@ export default function HelperPage() {
     });
   }, [selectedParent, locationUpdates, parentSharing, latestLocation]);
 
-    // Debug: log locationUpdates and selectedParentInfo on every render
-  console.log('RENDER locationUpdates:', locationUpdates);
-  console.log('RENDER selectedParentInfo:', selectedParentInfo);
   
   // Fetch parents and their status
   useEffect(() => {
@@ -220,15 +212,7 @@ export default function HelperPage() {
 
   return (
     <div className={styles.container}>
-      <header className={styles.header}>
-        <div className={styles.headerTop}>
-          <h1 className={styles.title}>Helper Dashboard</h1>
-          <button onClick={signOut} className={styles.signOutButton}>
-            Sign Out
-          </button>
-        </div>
-        <p className={styles.subtitle}>Welcome, {user.name}!</p>
-      </header>
+      {/* Main header only, temp duplicate removed */}
       <header className={styles.header}>
         <div className={styles.headerTop}>
           <h1 className={styles.title}>Helper Dashboard</h1>

@@ -14,36 +14,8 @@ import styles from './parent.module.css';
 import { prisma } from '@/lib/prisma/client';
 
 export default function ParentPage() {
-      // Periodically send location to backend while sharing
-      useEffect(() => {
-        if (!isSharing || !user?.id || !lastUpdate) return;
-        const interval = setInterval(async () => {
-          try {
-            const res = await fetch('/api/location-update', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                user_id: user.id,
-                latitude: lastUpdate.latitude,
-                longitude: lastUpdate.longitude,
-                accuracy: lastUpdate.accuracy,
-                battery_level: batteryLevel,
-                is_sharing: true,
-                timestamp: new Date(lastUpdate.timestamp).toISOString(),
-              }),
-            });
-            const result = await res.json();
-            if (!result.success) {
-              throw new Error(result.error || 'Failed to save location (interval)');
-            }
-          } catch (err) {
-            console.error('Failed to save location (interval):', err);
-          }
-        }, 30000); // 30 seconds
-        return () => clearInterval(interval);
-      }, [isSharing, user?.id, lastUpdate, batteryLevel]);
-    const [addHelperEmail, setAddHelperEmail] = useState("");
-    const [addHelperStatus, setAddHelperStatus] = useState<string | null>(null);
+  const [addHelperEmail, setAddHelperEmail] = useState("");
+  const [addHelperStatus, setAddHelperStatus] = useState<string | null>(null);
   const router = useRouter();
   const { user, loading: authLoading, signOut } = useAuth();
   const {
@@ -62,6 +34,35 @@ export default function ParentPage() {
   
   const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
   const [helperName, setHelperName] = useState<string>('your helper');
+
+  // Periodically send location to backend while sharing
+  useEffect(() => {
+    if (!isSharing || !user?.id || !lastUpdate) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch('/api/location-update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: user.id,
+            latitude: lastUpdate.latitude,
+            longitude: lastUpdate.longitude,
+            accuracy: lastUpdate.accuracy,
+            battery_level: batteryLevel,
+            is_sharing: true,
+            timestamp: new Date(lastUpdate.timestamp).toISOString(),
+          }),
+        });
+        const result = await res.json();
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to save location (interval)');
+        }
+      } catch (err) {
+        console.error('Failed to save location (interval):', err);
+      }
+    }, 30000); // 30 seconds
+    return () => clearInterval(interval);
+  }, [isSharing, user?.id, lastUpdate, batteryLevel]);
 
   // Check authentication and role
   useEffect(() => {
@@ -146,10 +147,26 @@ export default function ParentPage() {
     }
   }, [user, startSharing, batteryLevel, requestWakeLock]);
 
-  const handleStopSharing = useCallback(() => {
+  const handleStopSharing = useCallback(async () => {
     stopSharing();
     releaseWakeLock();
-  }, [stopSharing, releaseWakeLock]);
+    if (user?.id) {
+      try {
+        const res = await fetch('/api/location-update', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: user.id }),
+        });
+        const result = await res.json();
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to delete location data');
+        }
+        console.log('Deleted location data for user', user.id, 'count:', result.deleted);
+      } catch (err) {
+        console.error('Failed to delete location data:', err);
+      }
+    }
+  }, [stopSharing, releaseWakeLock, user?.id]);
 
   const handleSOSClick = useCallback(async () => {
     if (!user) return;
