@@ -1,0 +1,234 @@
+Build a live location tracking web app called "Najik" for helping elderly parents navigate the city.
+
+TECH STACK:
+- Next.js 14+ with App Router
+- React
+- TypeScript
+- Tailwind CSS for styling
+- Supabase for database, authentication, and real-time subscriptions
+- Mapbox or Leaflet with OpenStreetMap for maps (free tier)
+- Firebase Cloud Messaging (FCM) for push notifications
+- PWA (Progressive Web App) configuration for installable app experience
+
+CORE FEATURES:
+
+1. AUTHENTICATION:
+- Simple email/password login using Supabase Auth
+- Persistent sessions (remember login)
+- Two user roles: "parent" and "helper"
+- Role-based UI rendering - parents see sharing interface only, helpers see both sharing and dashboard
+
+2. PARENT'S APP (Sharing Side):
+- Extremely simple UI - large, clear buttons and text
+- Main screen has TWO main buttons:
+  
+  a) SHARE LOCATION button (green, large):
+     - Primary action button
+     - When active: Show clear visual feedback "Sharing with [helper name]" in large text
+     - Display battery level indicator
+     - "Stop Sharing" button when active (red, clear)
+     - Use browser Geolocation API with watchPosition() for continuous tracking
+     - Send location updates every 10 seconds while sharing
+     - Send push notification to helpers when sharing starts
+  
+  b) SOS/EMERGENCY button (bright red, large, equally prominent):
+     - Label: "SOS HELP" or "EMERGENCY"
+     - Icon: ⚠️ or 🚨
+     - Instant activation (no confirmation) for emergency situations
+     - When pressed:
+       * Play loud alarm sound from /public/sounds/sos-alarm.mp3
+       * Sound continues playing until helper acknowledges or parent cancels
+       * Vibrate phone (navigator.vibrate pattern)
+       * Screen flashes or shows red overlay
+       * Immediately sends HIGH PRIORITY push notification to all connected helpers
+       * Push notification bypasses Do Not Disturb mode
+       * Auto-captures and sends current GPS location (even if not sharing)
+       * Auto-starts location sharing if not already active
+       * Shows "SOS SENT - Help is notified" confirmation
+       * "Cancel SOS" button to stop alarm
+
+- Optional: Quick preset messages like "Going to market", "At doctor", "Coming home"
+- Wake Lock API to prevent screen from sleeping while sharing
+- Request notification permission on first app launch
+
+3. HELPER'S APP (Viewing Side):
+- Role-based navigation: Bottom tabs or nav showing "Share" and "Dashboard"
+- Share tab: Same interface as parents (helpers can share their location too)
+- Dashboard tab showing:
+  * Status of all connected parents
+  * For each parent: name, current status (sharing/not sharing/SOS), last seen time
+  * Visual SOS alert banner at top if any parent has active SOS
+  * Click on parent to see their live location on map
+
+- Map view with:
+  * Real-time marker showing parent's current location
+  * Breadcrumb trail showing recent path (last 30 minutes)
+  * Battery level display
+  * Time indicator of last update
+  * SOS indicator if emergency active
+  * Quick call/message buttons
+  * Option to send simple text directions to parent's phone
+
+- SOS Alert Handling:
+  * HIGH PRIORITY push notification even when app closed
+  * Push notification: "🚨 Emergency from [Parent Name] - Tap to view location"
+  * In-app real-time alert (if app open)
+  * Audible alert on helper's device
+  * Large red banner: "🚨 SOS from [Parent Name]"
+  * Auto-navigate to parent's location on map when notification tapped
+  * "Acknowledge SOS" button (stops alarm on both sides, sends confirmation push)
+  * Quick call button prominent
+  * SOS remains visible until acknowledged
+
+- Push Notification Types:
+  * SOS Alert (Critical priority, custom sound, bypass DND)
+  * Location sharing started (Medium priority)
+  * Battery low warning (Low priority)
+  * Optional: Geofence alerts (entered/left safe zones)
+
+4. PUSH NOTIFICATIONS SETUP:
+- Use Firebase Cloud Messaging (FCM) for cross-platform push notifications
+- Request notification permission on first app use
+- Store FCM device tokens in Supabase users table
+- Service worker handles background notifications
+- Notification click actions:
+  * SOS notification → Opens app to parent's location on map
+  * Sharing notification → Opens app to dashboard
+  * Battery warning → Opens app to that parent's status
+
+- Firebase Configuration:
+  * Create Firebase project (free tier)
+  * Add FCM config to environment variables
+  * Initialize Firebase in Next.js app
+  * Configure service worker for background messages
+  * Handle foreground and background notification states
+
+- Notification Permissions Flow:
+  * Request on first app launch with clear explanation
+  * "Allow notifications to receive emergency alerts"
+  * Store permission status in local storage
+  * Retry permission request if denied (with explanation why it's important)
+
+5. REAL-TIME FUNCTIONALITY:
+- Use Supabase Realtime for live location updates and SOS alerts (when app is open)
+- Use FCM push notifications for alerts when app is closed/background
+- Location updates appear on helper's map within 1-2 seconds
+- SOS alerts delivered instantly via both Realtime (if app open) and Push (if app closed)
+- Handle connection loss gracefully with "Last seen X minutes ago"
+- Auto-reconnect when connection restored
+
+6. PWA CONFIGURATION:
+- Make app installable on phone home screen
+- Works offline with cached UI
+- App icons and splash screens in multiple sizes
+- Manifest.json with proper configuration:
+  * name: "Najik"
+  * short_name: "Najik"
+  * display: "standalone"
+  * start_url: "/"
+  * background_color, theme_color
+  * icons (192x192, 512x512)
+- Service worker for:
+  * Offline capability
+  * Background push notifications
+  * Sound files caching
+  * Asset caching
+- Include sound files in service worker cache
+
+7. DATABASE SCHEMA (Supabase/PostgreSQL):
+- users table: id, email, name, role (parent/helper), fcm_token, notification_enabled, created_at
+- relationships table: helper_id, parent_id (which helper monitors which parent)
+- location_updates table: user_id, latitude, longitude, accuracy, battery_level, timestamp, is_sharing
+- sos_alerts table: id, user_id, latitude, longitude, timestamp, acknowledged_at, acknowledged_by, is_active
+- notifications_log table: id, user_id, type, title, body, sent_at, read_at (optional for history)
+- Optional: messages table for preset messages/notes
+
+8. UI/UX REQUIREMENTS:
+- Mobile-first responsive design
+- Large touch targets (min 60px) for elderly users
+- High contrast colors for readability
+- Two main buttons on parent screen should be equally prominent and accessible
+- SOS button always visible - never hidden or requiring multiple taps
+- Clear loading states and error messages
+- Dark mode support
+- Minimal navigation - everything accessible in 1-2 taps
+- Notification permission prompt with clear, non-technical language
+- Settings page to test notifications and manage preferences
+
+9. SECURITY & PRIVACY:
+- Row Level Security (RLS) in Supabase - users only see their own data
+- Location data only visible to connected helpers
+- SOS alerts only sent to connected helpers
+- FCM tokens stored securely and encrypted
+- Optional: Auto-stop sharing after configurable hours (default 4 hours)
+- Clear visual indicators when location is being shared
+- Notification settings: allow users to customize alert types
+
+10. AUDIO/SOUND IMPLEMENTATION:
+- Store SOS alarm sound in /public/sounds/sos-alarm.mp3
+- Use HTML5 Audio API for playback
+- Loop sound until acknowledged or cancelled
+- Volume control and sound testing in settings
+- Fallback to browser default alert if sound fails to load
+- Custom notification sounds via FCM (platform-dependent)
+
+11. ADDITIONAL FEATURES:
+- SOS history view (past alerts, timestamps, locations)
+- Notification history/log
+- Optional: Geofencing with safe zones (home, hospital) + push alerts
+- Location history view (past 24 hours)
+- Test SOS feature in settings (plays sound without alerting helpers)
+- Test notification feature (sends test push to own device)
+- Estimated time to common destinations
+- Battery monitoring with low battery push alerts
+
+DEPLOYMENT:
+- Host on Vercel (free tier)
+- Environment variables for Supabase credentials and Firebase config
+- Optimize for performance (lazy loading, code splitting)
+- Include sound files in build
+- Configure VAPID keys for web push
+- Set up Firebase project and add credentials
+
+PROJECT STRUCTURE:
+- /app - Next.js app directory
+- /components - Reusable React components
+- /lib - Utility functions, Supabase client, Firebase config, types
+- /public/sounds - Audio files (sos-alarm.mp3)
+- /public - PWA assets (icons, manifest, service worker)
+- /hooks - Custom React hooks for geolocation, realtime subscriptions, push notifications
+- /firebase - Firebase configuration and FCM utilities
+
+FIREBASE SETUP STEPS:
+1. Create Firebase project at console.firebase.google.com
+2. Enable Cloud Messaging
+3. Get Firebase config object and VAPID key
+4. Add to environment variables (NEXT_PUBLIC_FIREBASE_*)
+5. Configure service worker to handle background messages
+6. Create API routes for sending notifications (/api/send-notification)
+
+Start with:
+1. Set up Next.js project with TypeScript and Tailwind
+2. Configure Supabase project and get credentials
+3. Set up Firebase project and FCM credentials
+4. Set up authentication flow with role-based access
+5. Implement push notification permission flow
+6. Build parent's sharing interface with both Share Location and SOS buttons
+7. Implement SOS alert system with sound playback and push notifications
+8. Build helper's viewing interface with dashboard
+9. Implement real-time location updates and SOS alerts
+10. Configure service worker for background notifications
+11. Add PWA configuration
+12. Test notifications on different devices and browsers
+13. Deploy to Vercel
+
+CRITICAL IMPLEMENTATION NOTES:
+- Push notifications require HTTPS (Vercel provides this)
+- Test on actual mobile devices, not just browser DevTools
+- iOS requires iOS 16.4+ for full PWA push notification support
+- Service worker must be registered before requesting notification permission
+- FCM tokens can expire - implement token refresh logic
+- Handle notification permission denial gracefully
+- Provide clear value proposition before requesting notification permission
+
+Focus on simplicity and reliability over fancy features. The app should "just work" for non-technical elderly users. The SOS button with instant push notifications is a critical safety feature and should be foolproof and instantly accessible.
