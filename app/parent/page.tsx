@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useLocationSharing } from '@/hooks/useGeolocation';
+import { useSOSPolling } from '@/hooks/useSOSPolling';
 import { useSOS } from '@/hooks/useSOS';
 import { useWakeLock } from '@/hooks/useWakeLock';
 import Button from '@/components/Button/Button';
@@ -25,11 +26,8 @@ export default function ParentPage() {
     startSharing,
     stopSharing,
   } = useLocationSharing();
-  const {
-    isActive: sosActive,
-    triggerSOS,
-    cancelSOS,
-  } = useSOS(user?.id || '');
+  const { triggerSOS, cancelSOS } = useSOS(user?.id || '');
+  const { sosActive } = useSOSPolling(user?.id || '');
   const { requestWakeLock, releaseWakeLock, isLocked: wakeLockActive } = useWakeLock();
   
   const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
@@ -147,26 +145,10 @@ export default function ParentPage() {
     }
   }, [user, startSharing, batteryLevel, requestWakeLock]);
 
-  const handleStopSharing = useCallback(async () => {
+  const handleStopSharing = useCallback(() => {
     stopSharing();
     releaseWakeLock();
-    if (user?.id) {
-      try {
-        const res = await fetch('/api/location-update', {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ user_id: user.id }),
-        });
-        const result = await res.json();
-        if (!result.success) {
-          throw new Error(result.error || 'Failed to delete location data');
-        }
-        console.log('Deleted location data for user', user.id, 'count:', result.deleted);
-      } catch (err) {
-        console.error('Failed to delete location data:', err);
-      }
-    }
-  }, [stopSharing, releaseWakeLock, user?.id]);
+  }, [stopSharing, releaseWakeLock]);
 
   const handleSOSClick = useCallback(async () => {
     if (!user) return;
@@ -174,20 +156,16 @@ export default function ParentPage() {
     if (sosActive) {
       await cancelSOS();
     } else {
-      // Get current position for SOS
       if ('geolocation' in navigator) {
         navigator.geolocation.getCurrentPosition(
           async (pos) => {
             await triggerSOS(pos.coords.latitude, pos.coords.longitude);
-            
-            // Auto-start sharing if not already
             if (!isSharing) {
               handleStartSharing();
             }
           },
           (err) => {
             console.error('Failed to get location for SOS:', err);
-            // Trigger SOS anyway with no location
             triggerSOS(0, 0);
           }
         );
