@@ -148,13 +148,22 @@ export default function ParentPage() {
   const handleStopSharing = useCallback(() => {
     stopSharing();
     releaseWakeLock();
-  }, [stopSharing, releaseWakeLock]);
+    if (user?.id) {
+      fetch('/api/location-update', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: user.id }),
+      });
+    }
+  }, [stopSharing, releaseWakeLock, user?.id]);
 
   const handleSOSClick = useCallback(async () => {
     if (!user) return;
 
     if (sosActive) {
       await cancelSOS();
+      stopSharing();
+      releaseWakeLock();
     } else {
       if ('geolocation' in navigator) {
         navigator.geolocation.getCurrentPosition(
@@ -171,7 +180,7 @@ export default function ParentPage() {
         );
       }
     }
-  }, [user, sosActive, cancelSOS, triggerSOS, isSharing, handleStartSharing]);
+  }, [user, sosActive, cancelSOS, triggerSOS, isSharing, handleStartSharing, stopSharing, releaseWakeLock]);
 
   if (authLoading) {
     return <Loading size="large" text="Loading..." />;

@@ -87,6 +87,15 @@ export function useSOS(userId: string) {
         }
       }
 
+      // Delete all location_updates for this user
+      if (userId) {
+        await fetch('/api/location-update', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: userId }),
+        });
+      }
+
       // Stop alarm
       if (state.audio) {
         state.audio.pause();
@@ -109,7 +118,7 @@ export function useSOS(userId: string) {
       console.error('Error cancelling SOS:', error);
       return false;
     }
-  }, [state.alertId, state.audio]);
+  }, [state.alertId, state.audio, userId]);
 
   const acknowledgeSOS = useCallback(async (alertId: string, helperId: string) => {
     try {
