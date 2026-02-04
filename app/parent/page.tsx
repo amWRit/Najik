@@ -8,8 +8,11 @@ import { useSOSPolling } from '@/hooks/useSOSPolling';
 import { useSOS } from '@/hooks/useSOS';
 import { useWakeLock } from '@/hooks/useWakeLock';
 import Button from '@/components/Button/Button';
+import StatusIndicator from '@/components/StatusIndicator/StatusIndicator';
+import BatteryIndicator from '@/components/BatteryIndicator/BatteryIndicator';
 import Loading from '@/components/Loading/Loading';
 import styles from './parent.module.css';
+import { prisma } from '@/lib/prisma/client';
 
 export default function ParentPage() {
   const [addHelperEmail, setAddHelperEmail] = useState("");
@@ -52,8 +55,8 @@ export default function ParentPage() {
         if (!result.success) {
           throw new Error(result.error || 'Failed to save location (interval)');
         }
-      } catch {
-        // Error handled
+      } catch (err) {
+        console.error('Failed to save location (interval):', err);
       }
     }, 30000); // 30 seconds
     return () => clearInterval(interval);
@@ -72,7 +75,7 @@ export default function ParentPage() {
       signOut();
       router.push('/auth/login');
     }
-  }, [user, authLoading, router, signOut]);
+  }, [user, authLoading, router]);
 
   // Get battery level
   useEffect(() => {
@@ -85,8 +88,8 @@ export default function ParentPage() {
           battery.addEventListener('levelchange', () => {
             setBatteryLevel(Math.round(battery.level * 100));
           });
-        } catch {
-          // Error handled
+        } catch (err) {
+          console.error('Battery API not available:', err);
         }
       }
     };
@@ -104,8 +107,8 @@ export default function ParentPage() {
         if (data.helperName) {
           setHelperName(data.helperName);
         }
-        } catch {
-          // Error handled
+      } catch (err) {
+        console.error('Failed to fetch helper name:', err);
       }
     };
     fetchHelperName();
@@ -133,8 +136,8 @@ export default function ParentPage() {
         if (!result.success) {
           throw new Error(result.error || 'Failed to save location');
         }
-      } catch {
-        // Error handled
+      } catch (err) {
+        console.error('Failed to save location:', err);
       }
     });
     if (success) {
@@ -170,7 +173,8 @@ export default function ParentPage() {
               handleStartSharing();
             }
           },
-          () => {
+          (err) => {
+            console.error('Failed to get location for SOS:', err);
             triggerSOS(0, 0);
           }
         );
@@ -221,7 +225,7 @@ export default function ParentPage() {
                     setAddHelperStatus(result.error ? `❌ ${result.error}` : "❌ Failed to add helper.");
                 }
               }
-            } catch {
+            } catch (err) {
               setAddHelperStatus("❌ Network or server error while adding helper.");
             }
           }}
