@@ -9,8 +9,8 @@ const PRECACHE_ASSETS = [
   '/parent',
   '/helper',
   '/sounds/sos-alarm.mp3',
-  '/icon-192x192.png',
-  '/icon-512x512.png',
+  '/images/logos/icon-192x192.png',
+  '/images/logos/icon-512x512.png',
   '/manifest.json',
 ];
 
@@ -143,8 +143,8 @@ self.addEventListener('push', (event) => {
   const data = event.data.json();
   const options = {
     body: data.body || 'You have a new notification',
-    icon: '/icon-192x192.png',
-    badge: '/badge-72x72.png',
+    icon: '/images/logos/icon-192x192.png',
+    badge: '/images/logos/badge-72x72.png',
     vibrate: data.type === 'sos_alert' ? [500, 200, 500, 200, 500] : [200, 100, 200],
     data: data.data || {},
     requireInteraction: data.type === 'sos_alert',

@@ -78,14 +78,14 @@
       "short_name": "Share",
       "description": "Start sharing your location",
       "url": "/parent",
-      "icons": [{ "src": "/icon-192x192.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/images/logos/icon-192x192.png", "sizes": "192x192" }]
     },
     {
       "name": "View Dashboard",
       "short_name": "Dashboard",
       "description": "View helper dashboard",
       "url": "/helper",
-      "icons": [{ "src": "/icon-192x192.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/images/logos/icon-192x192.png", "sizes": "192x192" }]
     }
   ],
   "prefer_related_applications": false
