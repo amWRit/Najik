@@ -1,3 +1,21 @@
+.selectedParentCard {
+  border: 2px solid #0070f3;
+  box-shadow: 0 0 0 2px #0070f333;
+}
+/* Sharing Location label */
+.sharingLabel {
+  display: inline-block;
+  background: #22c55e;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.15em 0.7em;
+  border-radius: 999px;
+  margin-top: 0.5em;
+  margin-bottom: 0.25em;
+  letter-spacing: 0.02em;
+  box-shadow: 0 1px 2px rgba(34,197,94,0.08);
+}
 .container {
   min-height: 100vh;
   background: linear-gradient(135deg, #ede9fe 0%, #e0f2fe 100%);

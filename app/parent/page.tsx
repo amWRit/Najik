@@ -14,6 +14,36 @@ import styles from './parent.module.css';
 import { prisma } from '@/lib/prisma/client';
 
 export default function ParentPage() {
+      // Periodically send location to backend while sharing
+      useEffect(() => {
+        if (!isSharing || !user?.id || !lastUpdate) return;
+        const interval = setInterval(async () => {
+          try {
+            const res = await fetch('/api/location-update', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                user_id: user.id,
+                latitude: lastUpdate.latitude,
+                longitude: lastUpdate.longitude,
+                accuracy: lastUpdate.accuracy,
+                battery_level: batteryLevel,
+                is_sharing: true,
+                timestamp: new Date(lastUpdate.timestamp).toISOString(),
+              }),
+            });
+            const result = await res.json();
+            if (!result.success) {
+              throw new Error(result.error || 'Failed to save location (interval)');
+            }
+          } catch (err) {
+            console.error('Failed to save location (interval):', err);
+          }
+        }, 30000); // 30 seconds
+        return () => clearInterval(interval);
+      }, [isSharing, user?.id, lastUpdate, batteryLevel]);
+    const [addHelperEmail, setAddHelperEmail] = useState("");
+    const [addHelperStatus, setAddHelperStatus] = useState<string | null>(null);
   const router = useRouter();
   const { user, loading: authLoading, signOut } = useAuth();
   const {
@@ -90,8 +120,10 @@ export default function ParentPage() {
     const success = startSharing(async (position) => {
       try {
         if (!user?.id) throw new Error('User ID is missing');
-        await prisma.location_updates.create({
-          data: {
+        const res = await fetch('/api/location-update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
             user_id: user.id,
             latitude: position.latitude,
             longitude: position.longitude,
@@ -99,8 +131,12 @@ export default function ParentPage() {
             battery_level: batteryLevel,
             is_sharing: true,
             timestamp: new Date(position.timestamp).toISOString(),
-          },
+          }),
         });
+        const result = await res.json();
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to save location');
+        }
       } catch (err) {
         console.error('Failed to save location:', err);
       }
@@ -152,6 +188,58 @@ export default function ParentPage() {
 
   return (
     <div className={styles.container}>
+      {/* Add Helper UI */}
+      <section className={styles.addHelperSection}>
+        <h2>Add a Helper</h2>
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setAddHelperStatus(null);
+            if (!addHelperEmail) return setAddHelperStatus("Please enter an email.");
+            try {
+              const res = await fetch("/api/relationship/add", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ parent_id: user.id, helper_email: addHelperEmail }),
+              });
+              const result = await res.json();
+              if (result.success) {
+                setAddHelperStatus("✅ Helper added successfully!");
+                setAddHelperEmail("");
+              } else {
+                switch (res.status) {
+                  case 400:
+                    setAddHelperStatus("❌ Missing parent ID or helper email.");
+                    break;
+                  case 404:
+                    setAddHelperStatus("❌ Helper not found or not a helper. Please check the email and role.");
+                    break;
+                  case 409:
+                    setAddHelperStatus("⚠️ Relationship already exists.");
+                    break;
+                  default:
+                    setAddHelperStatus(result.error ? `❌ ${result.error}` : "❌ Failed to add helper.");
+                }
+              }
+            } catch (err) {
+              setAddHelperStatus("❌ Network or server error while adding helper.");
+            }
+          }}
+        >
+          <input
+            type="email"
+            placeholder="Helper's email"
+            value={addHelperEmail}
+            onChange={(e) => setAddHelperEmail(e.target.value)}
+            required
+            className={styles.input}
+          />
+          <Button type="submit" variant="primary" size="medium">
+            Add Helper
+          </Button>
+        </form>
+        {addHelperStatus && <p className={styles.statusMsg}>{addHelperStatus}</p>}
+      </section>
       <header className={styles.header}>
         <div className={styles.headerTop}>
           <h1 className={styles.title}>Najik</h1>

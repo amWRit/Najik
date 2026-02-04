@@ -24,7 +24,13 @@ export default function Card({
   ].filter(Boolean).join(' ');
 
   return (
-    <div className={classes} onClick={onClick}>
+    <div
+      className={classes}
+      onClick={onClick ? () => {
+        console.log('Card onClick triggered');
+        onClick();
+      } : undefined}
+    >
       {children}
     </div>
   );

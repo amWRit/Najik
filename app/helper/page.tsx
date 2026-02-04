@@ -24,16 +24,63 @@ interface ParentStatus {
 }
 
 export default function HelperPage() {
+    const [parentUsers, setParentUsers] = useState<{id: string, name: string, email: string}[]>([]);
+    const [selectedParent, setSelectedParent] = useState<User | null>(null);
+    // New state for latest location update
+    const [latestLocation, setLatestLocation] = useState<LocationUpdate | null>(null);
+    // Fetch latest location for selected parent (for fallback and debug)
+    useEffect(() => {
+      if (!selectedParent) {
+        setLatestLocation(null);
+        return;
+      }
+      const fetchLatest = async () => {
+        try {
+          const res = await fetch(`/api/location-update/latest?user_id=${selectedParent.id}`);
+          if (res.ok) {
+            const data = await res.json();
+            console.log('DEBUG: /api/location-update/latest response for selectedParent:', data);
+            setLatestLocation(data.locationUpdate || null);
+          } else {
+            console.warn('Failed to fetch latest locationUpdate for selectedParent', selectedParent.id, res.status);
+            setLatestLocation(null);
+          }
+        } catch (err) {
+          console.error('Error fetching latest locationUpdate for selectedParent', selectedParent.id, err);
+          setLatestLocation(null);
+        }
+      };
+      fetchLatest();
+    }, [selectedParent]);
+  
+    // Auto-select first parent when parentUsers is loaded
+    useEffect(() => {
+      if (parentUsers.length > 0 && !selectedParent) {
+        setSelectedParent({
+          id: parentUsers[0].id,
+          name: parentUsers[0].name,
+          email: parentUsers[0].email,
+        } as User);
+      }
+    }, [parentUsers, selectedParent]);
+    // Track sharing status for each parent
+    const [parentSharing, setParentSharing] = useState<Record<string, boolean>>({});
+  // (Test click handler removed)
+  // Selected parent info for display
+  const [selectedParentInfo, setSelectedParentInfo] = useState<ParentStatus | null>(null);
   const router = useRouter();
   const { user, loading: authLoading, signOut } = useAuth();
   const [parents, setParents] = useState<ParentStatus[]>([]);
-  const [selectedParent, setSelectedParent] = useState<ParentStatus | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [parentLoading, setParentLoading] = useState(true);
+  // Debug: log parentUsers on every render
+  console.debug('parentUsers state:', parentUsers);
 
   // Subscribe to location updates for selected parent
+  const locationFilter = selectedParent ? { column: 'user_id', value: selectedParent.id } : undefined;
+  console.debug('Subscribing to location_updates with filter:', locationFilter);
   const { data: locationUpdates } = useRealtimeSubscription<LocationUpdate>(
     'location_updates',
-    selectedParent ? { column: 'user_id', value: selectedParent.user.id } : undefined
+    locationFilter
   );
 
   // Subscribe to SOS alerts
@@ -57,19 +104,89 @@ export default function HelperPage() {
     }
   }, [user, authLoading, router]);
 
+  // Fetch latest location update for each parent to determine sharing status
+  useEffect(() => {
+    if (!parentUsers.length) {
+      setParentSharing({});
+      return;
+    }
+    const fetchSharing = async () => {
+      const sharing: Record<string, boolean> = {};
+      await Promise.all(parentUsers.map(async (parent) => {
+        try {
+          const res = await fetch(`/api/location-update/latest?user_id=${parent.id}`);
+          if (res.ok) {
+            const data = await res.json();
+            console.log('Fetched locationUpdate for parent', parent.id, parent.name, data.locationUpdate);
+            sharing[parent.id] = !!(data?.locationUpdate?.is_sharing);
+          } else {
+            console.warn('Failed to fetch locationUpdate for parent', parent.id, parent.name, res.status);
+            sharing[parent.id] = false;
+          }
+        } catch (err) {
+          console.error('Error fetching locationUpdate for parent', parent.id, parent.name, err);
+          sharing[parent.id] = false;
+        }
+      }));
+      setParentSharing(sharing);
+    };
+    fetchSharing();
+  }, [parentUsers]);
+
+  // Fetch selected parent's location and status when selected
+  useEffect(() => {
+    if (!selectedParent) {
+      setSelectedParentInfo(null);
+      setLatestLocation(null);
+      return;
+    }
+    // Find the latest location update for the selected parent
+    let lastLocation = null;
+    if (Array.isArray(locationUpdates) && locationUpdates.length > 0) {
+      lastLocation = locationUpdates[locationUpdates.length - 1];
+    } else if (latestLocation) {
+      // Fallback: use latestLocation from fetch if real-time is empty
+      lastLocation = latestLocation;
+    }
+    setLatestLocation(lastLocation);
+    // Debug: log latestLocation
+    console.debug('latestLocation (with fallback):', lastLocation);
+    setSelectedParentInfo({
+      user: selectedParent,
+      lastLocation,
+      sosAlert: null, // TODO: fetch SOS
+      isSharing: !!parentSharing[selectedParent.id],
+    });
+  }, [selectedParent, locationUpdates, parentSharing, latestLocation]);
+
+    // Debug: log locationUpdates and selectedParentInfo on every render
+  console.log('RENDER locationUpdates:', locationUpdates);
+  console.log('RENDER selectedParentInfo:', selectedParentInfo);
+  
   // Fetch parents and their status
-    useEffect(() => {
-      // TODO: Replace Supabase logic with Prisma or other backend fetch
-      // setParents([]); // Clear for now
-      setLoading(false);
-    }, [user]);
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user || !user.id || user.role !== 'helper') return;
+    setParentLoading(true);
+    fetch(`/api/relationship/parents?helper_id=${user.id}`)
+      .then(res => res.json())
+      .then(data => {
+        setParentUsers(data.parents || []);
+        setParentLoading(false);
+      })
+      .catch(() => {
+        setParentUsers([]);
+        setParentLoading(false);
+      });
+    // Only run when user.id or user.role changes
+  }, [authLoading, user?.id, user?.role]);
 
   // Auto-select parent if SOS alert
   useEffect(() => {
     if (sosAlerts.length > 0) {
       const sosParent = parents.find(p => p.sosAlert?.is_active);
       if (sosParent) {
-        setSelectedParent(sosParent);
+        setSelectedParent(sosParent.user);
       }
     }
   }, [sosAlerts, parents]);
@@ -93,7 +210,7 @@ export default function HelperPage() {
     return `${Math.floor(seconds / 3600)} hours ago`;
   };
 
-  if (authLoading || loading) {
+  if (authLoading) {
     return <Loading size="large" text="Loading dashboard..." />;
   }
 
@@ -112,13 +229,23 @@ export default function HelperPage() {
         </div>
         <p className={styles.subtitle}>Welcome, {user.name}!</p>
       </header>
+      <header className={styles.header}>
+        <div className={styles.headerTop}>
+          <h1 className={styles.title}>Helper Dashboard</h1>
+          <button onClick={signOut} className={styles.signOutButton}>
+            Sign Out
+          </button>
+        </div>
+        <p className={styles.subtitle}>Welcome, {user.name}!</p>
+      </header>
 
       <div className={styles.layout}>
         {/* Sidebar - Parents List */}
         <aside className={styles.sidebar}>
           <h2 className={styles.sidebarTitle}>Your Parents</h2>
-          
-          {parents.length === 0 ? (
+          {parentLoading ? (
+            <Loading size="large" text="Loading parents..." />
+          ) : parentUsers.length === 0 ? (
             <Card>
               <p className={styles.emptyMessage}>
                 No parents connected yet. Ask them to add you as a helper.
@@ -126,68 +253,64 @@ export default function HelperPage() {
             </Card>
           ) : (
             <div className={styles.parentsList}>
-              {parents.map((parent) => (
-                <Card
-                  key={parent.user.id}
-                  variant={selectedParent?.user.id === parent.user.id ? 'elevated' : 'default'}
-                  onClick={() => setSelectedParent(parent)}
-                  className={styles.parentCard}
-                >
-                  <div className={styles.parentInfo}>
-                    <h3 className={styles.parentName}>{parent.user.name}</h3>
-                    
-                    {parent.sosAlert?.is_active && (
-                      <StatusIndicator status="sos" text="SOS ALERT" pulse />
-                    )}
-                    {parent.isSharing && !parent.sosAlert?.is_active && (
-                      <StatusIndicator status="sharing" text="Sharing" />
-                    )}
-                    {!parent.isSharing && !parent.sosAlert?.is_active && (
-                      <StatusIndicator status="offline" text="Offline" />
-                    )}
-
-                    {parent.lastLocation && (
-                      <div className={styles.parentMeta}>
-                        <span className={styles.metaItem}>
-                          {getTimeSince(parent.lastLocation.timestamp)}
-                        </span>
-                        {parent.lastLocation.battery_level && (
-                          <BatteryIndicator
-                            level={parent.lastLocation.battery_level}
-                            size="small"
-                          />
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </Card>
-              ))}
+              {parentUsers.map((parent) => {
+                const isSelected = selectedParent && selectedParent.id === parent.id;
+                return (
+                  <Card
+                    key={parent.id}
+                    className={
+                      styles.parentCard +
+                      (isSelected ? ' ' + styles.selectedParentCard : '') +
+                      ' cursor-pointer'
+                    }
+                    onClick={() => {
+                      console.log('Parent card clicked:', parent);
+                      setSelectedParent({ id: parent.id, name: parent.name, email: parent.email } as User);
+                    }}
+                  >
+                    <div className={styles.parentInfo}>
+                      <h3 className={styles.parentName}>{parent.name}</h3>
+                      <span className={styles.parentEmail}>{parent.email}</span>
+                      {parentSharing[parent.id] && (
+                        <span className={styles.sharingLabel}>Sharing Location</span>
+                      )}
+                      <button
+                        style={{marginTop:'0.5rem',padding:'0.25rem 0.5rem',background:'#0070f3',color:'#fff',border:'none',borderRadius:'4px',cursor:'pointer'}}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedParent({ id: parent.id, name: parent.name, email: parent.email } as User);
+                        }}
+                      >Select</button>
+                    </div>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </aside>
 
         {/* Main Content - Map and Details */}
         <main className={styles.mainContent}>
-          {selectedParent ? (
+          {selectedParentInfo ? (
             <>
               {/* SOS Alert Banner */}
-              {selectedParent.sosAlert?.is_active && (
+              {selectedParentInfo.sosAlert?.is_active && (
                 <div className={styles.sosAlert}>
                   <div className={styles.sosAlertContent}>
                     <span className={styles.sosIcon}>🚨</span>
                     <div>
                       <h3 className={styles.sosTitle}>
-                        EMERGENCY from {selectedParent.user.name}
+                        EMERGENCY from {selectedParentInfo.user.name}
                       </h3>
                       <p className={styles.sosTime}>
-                        {new Date(selectedParent.sosAlert.timestamp).toLocaleString()}
+                        {selectedParentInfo.sosAlert.timestamp ? new Date(selectedParentInfo.sosAlert.timestamp).toLocaleString() : ''}
                       </p>
                     </div>
                   </div>
                   <Button
                     variant="success"
                     size="medium"
-                    onClick={() => handleAcknowledgeSOS(selectedParent.sosAlert!.id)}
+                    onClick={() => handleAcknowledgeSOS(selectedParentInfo.sosAlert!.id)}
                   >
                     ✓ Acknowledge SOS
                   </Button>
@@ -195,15 +318,19 @@ export default function HelperPage() {
               )}
 
               {/* Map */}
-              {selectedParent.lastLocation ? (
+              {selectedParentInfo.lastLocation ? (
                 <div className={styles.mapContainer}>
                   <Map
                     center={[
-                      selectedParent.lastLocation.latitude,
-                      selectedParent.lastLocation.longitude,
+                      selectedParentInfo.lastLocation.latitude,
+                      selectedParentInfo.lastLocation.longitude,
                     ]}
-                    locations={locationUpdates}
-                    sosActive={selectedParent.sosAlert?.is_active}
+                    locations={
+                      Array.isArray(locationUpdates) && locationUpdates.length > 0
+                        ? locationUpdates
+                        : [selectedParentInfo.lastLocation]
+                    }
+                    sosActive={selectedParentInfo.sosAlert?.is_active}
                   />
                 </div>
               ) : (
@@ -211,32 +338,32 @@ export default function HelperPage() {
                   <div className={styles.noLocation}>
                     <span className={styles.noLocationIcon}>📍</span>
                     <h3>No Location Data</h3>
-                    <p>{selectedParent.user.name} hasn't shared their location yet.</p>
+                    <p>{selectedParentInfo.user.name} hasn't shared their location yet.</p>
                   </div>
                 </Card>
               )}
 
               {/* Location Details */}
-              {selectedParent.lastLocation && (
+              {selectedParentInfo.lastLocation && (
                 <Card variant="elevated" className={styles.detailsCard}>
                   <h3 className={styles.detailsTitle}>Location Details</h3>
                   <div className={styles.detailsGrid}>
                     <div className={styles.detailItem}>
                       <span className={styles.detailLabel}>Last Update</span>
                       <span className={styles.detailValue}>
-                        {new Date(selectedParent.lastLocation.timestamp).toLocaleString()}
+                        {new Date(selectedParentInfo.lastLocation.timestamp).toLocaleString()}
                       </span>
                     </div>
                     <div className={styles.detailItem}>
                       <span className={styles.detailLabel}>Accuracy</span>
                       <span className={styles.detailValue}>
-                        ±{Math.round(selectedParent.lastLocation.accuracy)}m
+                        ±{Math.round(selectedParentInfo.lastLocation.accuracy)}m
                       </span>
                     </div>
                     <div className={styles.detailItem}>
                       <span className={styles.detailLabel}>Coordinates</span>
                       <span className={styles.detailValue}>
-                        {selectedParent.lastLocation.latitude.toFixed(6)}, {selectedParent.lastLocation.longitude.toFixed(6)}
+                        {selectedParentInfo.lastLocation.latitude.toFixed(6)}, {selectedParentInfo.lastLocation.longitude.toFixed(6)}
                       </span>
                     </div>
                   </div>
