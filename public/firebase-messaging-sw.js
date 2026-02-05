@@ -23,7 +23,7 @@ messaging.onBackgroundMessage((payload) => {
   const notificationTitle = payload.notification?.title || 'Najik';
   const notificationOptions = {
     body: payload.notification?.body || '',
-    icon: '/icon-192x192.png',
+    icon: '/images/logos/icon-192x192.png',
     badge: '/badge-72x72.png',
     tag: payload.data?.type || 'default',
     requireInteraction: payload.data?.type === 'sos_alert',

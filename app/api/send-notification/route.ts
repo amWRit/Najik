@@ -1,12 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import * as admin from 'firebase-admin';
 
 // Initialize Firebase Admin SDK
 if (!admin.apps.length) {
-  const serviceAccount = require('@/firebase-service-account.json');
+  const serviceAccount = {
+    type: process.env.FIREBASE_TYPE,
+    project_id: process.env.FIREBASE_PROJECT_ID,
+    private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
+    private_key: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+    client_email: process.env.FIREBASE_CLIENT_EMAIL,
+    client_id: process.env.FIREBASE_CLIENT_ID,
+    auth_uri: process.env.FIREBASE_AUTH_URI,
+    token_uri: process.env.FIREBASE_TOKEN_URI,
+    auth_provider_x509_cert_url: process.env.FIREBASE_AUTH_PROVIDER_X509_CERT_URL,
+    client_x509_cert_url: process.env.FIREBASE_CLIENT_X509_CERT_URL,
+    universe_domain: process.env.FIREBASE_UNIVERSE_DOMAIN,
+  };
   admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
+    credential: admin.credential.cert(serviceAccount as admin.ServiceAccount),
   });
 }
 
@@ -19,44 +30,15 @@ interface NotificationPayload {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    
-    // Check authentication
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const body = await request.json();
-    const { recipientIds, notification }: { recipientIds: string[]; notification: NotificationPayload } = body;
+    const { recipientTokens, notification }: { recipientTokens: string[]; notification: NotificationPayload } = body;
 
-    if (!recipientIds || !notification) {
+    if (!recipientTokens || !notification) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // Get FCM tokens for recipients
-    const { data: users, error: usersError } = await supabase
-      .from('users')
-      .select('id, fcm_token, notification_enabled')
-      .in('id', recipientIds)
-      .eq('notification_enabled', true);
-
-    if (usersError) throw usersError;
-
-    if (!users || users.length === 0) {
-      return NextResponse.json({ message: 'No valid users found' }, { status: 200 });
-    }
-
-    const tokens = users
-      .filter((u: any) => u.fcm_token)
-      .map((u: any) => u.fcm_token as string);
-
-    if (tokens.length === 0) {
-      return NextResponse.json({ message: 'No valid FCM tokens found' }, { status: 200 });
-    }
-
     // Send notifications using Firebase Admin SDK (V1 API)
-    const messages = tokens.map((token: string) => ({
+    const messages = recipientTokens.map((token: string) => ({
       token,
       notification: {
         title: notification.title,
@@ -74,40 +56,22 @@ export async function POST(request: NextRequest) {
         },
       },
       android: {
-        priority: notification.priority === 'high' ? 'high' as 'high' : 'normal' as 'normal',
-      },
+        priority: notification.priority === 'high' ? 'high' : 'normal',
+      } as const,
       apns: {
         headers: {
           'apns-priority': notification.priority === 'high' ? '10' : '5',
-        },
+        } as const,
       },
     }));
 
     const fcmResult = await admin.messaging().sendEach(messages);
 
-    // Log notifications
-    if (users && users.length > 0) {
-      const notificationLogs = users.map((u: any) => ({
-        user_id: u.id as string,
-        type: (notification.data?.type as any) || 'location_sharing_started',
-        title: notification.title,
-        body: notification.body,
-      }));
-
-      const { error: logError } = await supabase
-        .from('notifications_log')
-        .insert(notificationLogs as any);
-      
-      if (logError) {
-        console.error('Error logging notifications:', logError);
-      }
-    }
-
     return NextResponse.json({ 
       success: true, 
       successCount: fcmResult.successCount,
       failureCount: fcmResult.failureCount,
-      sentTo: tokens.length,
+      sentTo: recipientTokens.length,
     });
   } catch (error: any) {
     console.error('Error sending notification:', error);

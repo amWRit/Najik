@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { SOSState } from '@/lib/types/database.types';
-import { prisma } from '@/lib/prisma/client';
+
 
 const SOS_SOUND_PATH = '/sounds/sos-alarm.mp3';
 
@@ -41,16 +41,17 @@ export function useSOS(userId: string) {
 
   const triggerSOS = useCallback(async (latitude: number, longitude: number) => {
     try {
-      // Create SOS alert in database using Prisma
-      const alert = await prisma.sos_alerts.create({
-        data: {
-          user_id: userId,
-          latitude,
-          longitude,
-          is_active: true,
-          timestamp: new Date().toISOString(),
-        },
+      // Call API route to create SOS alert
+      const res = await fetch('/api/sos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, latitude, longitude }),
       });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to create SOS alert');
+      }
+      const data = await res.json();
 
       // Play alarm sound
       const audio = playAlarm();
@@ -61,11 +62,11 @@ export function useSOS(userId: string) {
       // Update state
       setState({
         isActive: true,
-        alertId: alert.id,
+        alertId: data.id,
         audio,
       });
 
-      return alert.id;
+      return data.id;
     } catch (error) {
       console.error('Error triggering SOS:', error);
       throw error;
@@ -75,10 +76,23 @@ export function useSOS(userId: string) {
   const cancelSOS = useCallback(async () => {
     try {
       if (state.alertId) {
-        // Update SOS alert as inactive using Prisma
-        await prisma.sos_alerts.update({
-          where: { id: state.alertId },
-          data: { is_active: false },
+        // Call API route to update SOS alert as inactive
+        const res = await fetch(`/api/sos/${state.alertId}/cancel`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        if (!res.ok) {
+          const errorData = await res.json();
+          throw new Error(errorData.error || 'Failed to cancel SOS alert');
+        }
+      }
+
+      // Delete all location_updates for this user
+      if (userId) {
+        await fetch('/api/location-update', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: userId }),
         });
       }
 
@@ -98,20 +112,20 @@ export function useSOS(userId: string) {
         alertId: null,
         audio: null,
       });
+
+      return true;
     } catch (error) {
-      console.error('Error canceling SOS:', error);
+      console.error('Error cancelling SOS:', error);
+      return false;
     }
-  }, [state]);
+  }, [state.alertId, state.audio, userId]);
 
   const acknowledgeSOS = useCallback(async (alertId: string, helperId: string) => {
     try {
-      await prisma.sos_alerts.update({
-        where: { id: alertId },
-        data: {
-          is_active: false,
-          acknowledged_at: new Date().toISOString(),
-          acknowledged_by: helperId,
-        },
+      await fetch(`/api/sos/${alertId}/acknowledge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ helperId }),
       });
       return true;
     } catch (error) {

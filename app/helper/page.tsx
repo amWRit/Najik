@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useParentSOSPolling } from '@/hooks/useParentSOSPolling';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useRealtimeSubscription } from '@/hooks/useRealtime';
@@ -68,6 +69,8 @@ export default function HelperPage() {
   // (Test click handler removed)
   // Selected parent info for display
   const [selectedParentInfo, setSelectedParentInfo] = useState<ParentStatus | null>(null);
+  // SOS polling for selected parent
+  const { sosActive: parentSOSActive } = useParentSOSPolling(selectedParent?.id || '');
   const router = useRouter();
   const { user, loading: authLoading, signOut } = useAuth();
   const [parents, setParents] = useState<ParentStatus[]>([]);
@@ -149,10 +152,21 @@ export default function HelperPage() {
     setSelectedParentInfo({
       user: selectedParent,
       lastLocation,
-      sosAlert: null, // TODO: fetch SOS
+      sosAlert: parentSOSActive
+        ? {
+            id: 'active',
+            user_id: selectedParent.id,
+            latitude: 0,
+            longitude: 0,
+            timestamp: new Date().toISOString(),
+            acknowledged_at: null,
+            acknowledged_by: null,
+            is_active: true,
+          }
+        : null,
       isSharing: !!parentSharing[selectedParent.id],
     });
-  }, [selectedParent, locationUpdates, parentSharing, latestLocation]);
+  }, [selectedParent, locationUpdates, parentSharing, latestLocation, parentSOSActive]);
 
   
   // Fetch parents and their status
