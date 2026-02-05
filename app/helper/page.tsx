@@ -325,9 +325,7 @@ export default function HelperPage() {
     <div className={styles.container}>
       {/* Toast for SOS cancel/acknowledge */}
       {showCancelToast && (
-        <div style={{ position: 'fixed', top: 20, left: 0, right: 0, zIndex: 9999 }}>
-          <Toast message={toastMsg} onClose={() => setShowCancelToast(false)} />
-        </div>
+        <Toast message={toastMsg} onClose={() => setShowCancelToast(false)} />
       )}
       <Modal isOpen={showWelcome} onClose={() => setShowWelcome(false)} title="Welcome to Najik Helper Dashboard!">
         <div className="flex flex-col items-center justify-center gap-4">

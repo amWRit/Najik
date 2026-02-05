@@ -222,9 +222,7 @@ export default function ParentPage() {
     <div className={styles.container}>
       {/* Toast for SOS cancelled by helper */}
       {showCancelToast && (
-        <div style={{ position: 'fixed', top: 20, left: 0, right: 0, zIndex: 9999 }}>
-          <Toast message="SOS cancelled by helper" type="success" onClose={() => setShowCancelToast(false)} />
-        </div>
+          <Toast message="SOS acknowledged by your helper." onClose={() => setShowCancelToast(false)} />
       )}
       {/* Add Helper UI */}
       <section className={styles.addHelperSection}>
