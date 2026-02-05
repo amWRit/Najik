@@ -14,6 +14,9 @@ import Loading from '@/components/Loading/Loading';
 import Toast from '@/components/Toast/Toast';
 import styles from './parent.module.css';
 import { prisma } from '@/lib/prisma/client';
+import Navbar from '@/components/Navbar/Navbar';
+import SupportersModal from '@/components/SupportersModal/SupportersModal';
+import AddSupporterModal from '@/components/AddSupporterModal/AddSupporterModal';
 
 export default function ParentPage() {
   const [addHelperEmail, setAddHelperEmail] = useState("");
@@ -136,6 +139,25 @@ export default function ParentPage() {
     fetchHelperName();
   }, [user]);
 
+  // Fetch supporters from DB
+  useEffect(() => {
+    if (!user?.id) return;
+    const fetchSupporters = async () => {
+      try {
+        const res = await fetch(`/api/relationship/supporters?parent_id=${user.id}`);
+        const data = await res.json();
+        if (Array.isArray(data.supporters)) {
+          setHelpers(data.supporters);
+        }
+      } catch (err) {
+        console.error('Failed to fetch supporters:', err);
+      }
+    };
+    fetchSupporters();
+  }, [user?.id]);
+
+  const [helpers, setHelpers] = useState<string[]>([]);
+
   const handleStartSharing = useCallback(() => {
     if (!user || !user.id) return;
     const success = startSharing(async (position) => {
@@ -210,6 +232,90 @@ export default function ParentPage() {
     }
   }, [lastUpdate]);
 
+  // Navbar settings modal state
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+  const [showHelpersModal, setShowHelpersModal] = useState(false);
+  const [showAddHelperModal, setShowAddHelperModal] = useState(false);
+
+  // Handler for settings icon
+  const handleSettingsClick = () => setShowSettingsMenu(true);
+  const handleCloseSettingsMenu = () => setShowSettingsMenu(false);
+
+  // Handler for helpers modal
+  const handleOpenHelpersModal = () => {
+    setShowHelpersModal(true);
+    setShowSettingsMenu(false);
+  };
+  const handleCloseHelpersModal = () => setShowHelpersModal(false);
+
+  // Handler for add helper modal
+  const handleOpenAddHelperModal = () => setShowAddHelperModal(true);
+  const handleCloseAddHelperModal = () => setShowAddHelperModal(false);
+
+  // Add supporter logic (API call)
+  const handleAddHelper = async (email: string) => {
+    setAddHelperStatus(null);
+    if (!email) {
+      setAddHelperStatus('Please enter an email.');
+      return;
+    }
+    if (!user || !user.id) {
+      setAddHelperStatus('❌ User not found. Please log in again.');
+      return;
+    }
+    try {
+      const res = await fetch('/api/relationship/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ parent_id: user.id, helper_email: email }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        setHelpers([...helpers, email]);
+        setAddHelperStatus('✅ Supporter added successfully!');
+        setAddHelperEmail('');
+        setShowAddHelperModal(false);
+      } else {
+        switch (res.status) {
+          case 400:
+            setAddHelperStatus('❌ Missing parent ID or supporter email.');
+            break;
+          case 404:
+            setAddHelperStatus('❌ Supporter not found or not a helper. Please check the email and role.');
+            break;
+          case 409:
+            setAddHelperStatus('⚠️ Relationship already exists.');
+            break;
+          default:
+            setAddHelperStatus(result.error ? `❌ ${result.error}` : '❌ Failed to add supporter.');
+        }
+      }
+    } catch (err) {
+      setAddHelperStatus('❌ Network or server error while adding supporter.');
+    }
+  };
+
+  // Delete supporter logic (API call)
+  const handleDeleteHelper = async (email: string) => {
+    if (!user || !user.id) return;
+    try {
+      const res = await fetch('/api/relationship/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ parent_id: user.id, helper_email: email }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        setHelpers(helpers.filter(h => h !== email));
+      } else {
+        // Optionally show error to user
+        console.error(result.error || 'Failed to delete supporter.');
+      }
+    } catch (err) {
+      console.error('Network or server error while deleting supporter.', err);
+    }
+  };
+
   if (authLoading) {
     return <Loading size="large" text="Loading..." />;
   }
@@ -219,69 +325,46 @@ export default function ParentPage() {
   }
 
   return (
-    <div className={styles.container}>
-      {/* Toast for SOS cancelled by helper */}
-      {showCancelToast && (
-          <Toast message="SOS acknowledged by your helper." onClose={() => setShowCancelToast(false)} />
+    <div className="pt-16">
+      <Navbar onSettingsClick={handleSettingsClick} title="Najik" onSignOut={signOut} />
+      {/* Settings Menu Modal */}
+      {showSettingsMenu && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-80">
+            <h2 className="text-lg font-semibold mb-4">Settings</h2>
+            <button className="w-full text-left py-2 px-3 hover:bg-gray-100 rounded" onClick={handleOpenHelpersModal}>
+              Supporters
+            </button>
+            <button className="w-full text-left py-2 px-3 hover:bg-gray-100 rounded mt-2" onClick={signOut}>
+              Sign Out
+            </button>
+            <button className="w-full text-left py-2 px-3 hover:bg-gray-100 rounded mt-2" onClick={handleCloseSettingsMenu}>
+              Close
+            </button>
+          </div>
+        </div>
       )}
-      {/* Add Helper UI */}
-      <section className={styles.addHelperSection}>
-        <h2>Add a Helper</h2>
-        <form
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setAddHelperStatus(null);
-            if (!addHelperEmail) return setAddHelperStatus("Please enter an email.");
-            try {
-              const res = await fetch("/api/relationship/add", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ parent_id: user.id, helper_email: addHelperEmail }),
-              });
-              const result = await res.json();
-              if (result.success) {
-                setAddHelperStatus("✅ Helper added successfully!");
-                setAddHelperEmail("");
-              } else {
-                switch (res.status) {
-                  case 400:
-                    setAddHelperStatus("❌ Missing parent ID or helper email.");
-                    break;
-                  case 404:
-                    setAddHelperStatus("❌ Helper not found or not a helper. Please check the email and role.");
-                    break;
-                  case 409:
-                    setAddHelperStatus("⚠️ Relationship already exists.");
-                    break;
-                  default:
-                    setAddHelperStatus(result.error ? `❌ ${result.error}` : "❌ Failed to add helper.");
-                }
-              }
-            } catch (err) {
-              setAddHelperStatus("❌ Network or server error while adding helper.");
-            }
-          }}
-        >
-          <input
-            type="email"
-            placeholder="Helper's email"
-            value={addHelperEmail}
-            onChange={(e) => setAddHelperEmail(e.target.value)}
-            required
-            className={styles.input}
-          />
-          <Button type="submit" variant="primary" size="medium">
-            Add Helper
-          </Button>
-        </form>
-        {addHelperStatus && <p className={styles.statusMsg}>{addHelperStatus}</p>}
-      </section>
+      {/* Supporters Modal */}
+      <SupportersModal
+        open={showHelpersModal}
+        supporters={helpers}
+        onDelete={handleDeleteHelper}
+        onAdd={handleOpenAddHelperModal}
+        onClose={handleCloseHelpersModal}
+      />
+      {/* Add Supporter Modal */}
+      <AddSupporterModal
+        open={showAddHelperModal}
+        email={addHelperEmail}
+        status={addHelperStatus}
+        onEmailChange={setAddHelperEmail}
+        onAdd={() => handleAddHelper(addHelperEmail)}
+        onClose={handleCloseAddHelperModal}
+      />
+      {/* Add Helper UI - removed, logic moved to Add Supporter modal */}
       <header className={styles.header}>
         <div className={styles.headerTop}>
           <h1 className={styles.title}>Najik</h1>
-          <button type="button" onClick={() => signOut()} className={styles.signOutButton}>
-            Sign Out
-          </button>
         </div>
         <p className={styles.subtitle}>Hello, {user?.name}!</p>
       </header>

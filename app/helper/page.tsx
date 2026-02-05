@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useRealtimeSubscription } from '@/hooks/useRealtime';
 import { LocationUpdate, SOSAlert, User } from '@/lib/types/database.types';
+
 import Button from '@/components/Button/Button';
 import Card from '@/components/Card/Card';
 import StatusIndicator from '@/components/StatusIndicator/StatusIndicator';
@@ -14,8 +15,9 @@ import BatteryIndicator from '@/components/BatteryIndicator/BatteryIndicator';
 import Loading from '@/components/Loading/Loading';
 import Modal from '@/components/Modal/Modal';
 import Toast from '@/components/Toast/Toast';
-import dynamic from 'next/dynamic';
+import Navbar from '@/components/Navbar/Navbar';
 import styles from './helper.module.css';
+import dynamic from 'next/dynamic';
 
 // Dynamically import Map component (client-side only)
 const Map = dynamic(() => import('@/components/Map/Map'), { ssr: false });
@@ -327,31 +329,27 @@ export default function HelperPage() {
   }
 
     return (
-    <div className={styles.container}>
-      {/* Toast for SOS cancel/acknowledge */}
-      {showCancelToast && (
-        <Toast message={toastMsg} onClose={() => setShowCancelToast(false)} />
-      )}
-      <Modal isOpen={showWelcome} onClose={() => setShowWelcome(false)} title="Welcome to Najik Helper Dashboard!">
-        <div className="flex flex-col items-center justify-center gap-4">
-          <p className="text-base text-gray-700">This dashboard helps you monitor and assist your connected parents in real time.</p>
-          <Button size="large" variant="primary" onClick={() => setShowWelcome(false)}>
-            OK
-          </Button>
-        </div>
-      </Modal>
-      {/* Main header only, temp duplicate removed */}
-      <header className={styles.header}>
-        <div className={styles.headerTop}>
-          <h1 className={styles.title}>Helper Dashboard</h1>
-          <button onClick={signOut} className={styles.signOutButton}>
-            Sign Out
-          </button>
-        </div>
-        <p className={styles.subtitle}>Welcome, {user.name}!</p>
-      </header>
-
-      <div className={styles.layout}>
+      <div className={styles.container}>
+        {/* Toast for SOS cancel/acknowledge */}
+        {showCancelToast && (
+          <Toast message={toastMsg} onClose={() => setShowCancelToast(false)} />
+        )}
+        <Modal isOpen={showWelcome} onClose={() => setShowWelcome(false)} title="Welcome to Najik Helper Dashboard!">
+          <div className="flex flex-col items-center justify-center gap-4">
+            <p className="text-base text-gray-700">This dashboard helps you monitor and assist your connected parents in real time.</p>
+            <Button size="large" variant="primary" onClick={() => setShowWelcome(false)}>
+              OK
+            </Button>
+          </div>
+        </Modal>
+        {/* Navbar with settings menu */}
+        <Navbar
+          title="Najik Helper"
+          userRole="helper"
+          userName={user.name ?? undefined}
+          onSignOut={signOut}
+        />
+        <div className={styles.layout}>
         {/* Sidebar - Parents List */}
         <aside className={styles.sidebar}>
           <h2 className={styles.sidebarTitle}>Your Parents</h2>
@@ -498,6 +496,6 @@ export default function HelperPage() {
           )}
         </main>
       </div>
-    </div>
-  );
+      </div>
+    );
 }
