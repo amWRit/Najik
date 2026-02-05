@@ -18,11 +18,20 @@ export async function POST(
     }
 
     // Delete all SOS alerts for this user
-    const result = await prisma.sos_alerts.deleteMany({
+    const sosResult = await prisma.sos_alerts.deleteMany({
       where: { user_id: alert.user_id },
     });
 
-    return NextResponse.json({ success: true, count: result.count }, { status: 200 });
+    // Delete all location updates for this user
+    const locationResult = await prisma.location_updates.deleteMany({
+      where: { user_id: alert.user_id },
+    });
+
+    return NextResponse.json({
+      success: true,
+      sosDeleted: sosResult.count,
+      locationUpdatesDeleted: locationResult.count,
+    }, { status: 200 });
   } catch (error) {
     console.error('Error canceling SOS alert:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
