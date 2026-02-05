@@ -96,10 +96,13 @@ export function useSOS(userId: string) {
         });
       }
 
-      // Stop alarm
+      // Debug: check if audio exists
       if (state.audio) {
+        console.log('[SOS DEBUG] Stopping alarm audio instance:', state.audio);
         state.audio.pause();
         state.audio.currentTime = 0;
+      } else {
+        console.log('[SOS DEBUG] No alarm audio instance to stop.');
       }
 
       // Stop vibration

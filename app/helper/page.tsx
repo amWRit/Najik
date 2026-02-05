@@ -13,6 +13,7 @@ import StatusIndicator from '@/components/StatusIndicator/StatusIndicator';
 import BatteryIndicator from '@/components/BatteryIndicator/BatteryIndicator';
 import Loading from '@/components/Loading/Loading';
 import Modal from '@/components/Modal/Modal';
+import Toast from '@/components/Toast/Toast';
 import dynamic from 'next/dynamic';
 import styles from './helper.module.css';
 
@@ -27,6 +28,9 @@ interface ParentStatus {
 }
 
 export default function HelperPage() {
+            // Toast for cancel/acknowledge
+            const [showCancelToast, setShowCancelToast] = useState(false);
+            const [toastMsg, setToastMsg] = useState('');
           // Welcome modal state
           const [showWelcome, setShowWelcome] = useState(true);
         // Unlock audio context on first user interaction
@@ -259,14 +263,47 @@ export default function HelperPage() {
 
   const handleAcknowledgeSOS = async (alertId: string) => {
     if (!user) return;
-    // TODO: Replace Supabase update with Prisma or other backend mutation
-    setParents(prev =>
-      prev.map(p =>
-        p.sosAlert?.id === alertId
-          ? { ...p, sosAlert: null }
-          : p
-      )
-    );
+    try {
+      const res = await fetch(`/api/sos/${alertId}/update`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          is_active: false,
+          acknowledged_by: user.id,
+          acknowledged_at: new Date().toISOString(),
+        }),
+      });
+      const result = await res.json();
+      // Stop alarm audio immediately
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+        audioRef.current = null;
+      }
+      if (res.ok && result.success) {
+        setToastMsg('SOS acknowledged and alarm cancelled');
+        setShowCancelToast(true);
+        setParents(prev =>
+          prev.map(p =>
+            p.sosAlert?.id === alertId
+              ? { ...p, sosAlert: null }
+              : p
+          )
+        );
+      } else {
+        setToastMsg(result.error || 'Failed to acknowledge SOS');
+        setShowCancelToast(true);
+      }
+    } catch (err) {
+      // Stop alarm audio on error as well
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+        audioRef.current = null;
+      }
+      setToastMsg('Network error while acknowledging SOS');
+      setShowCancelToast(true);
+    }
   };
 
   const getTimeSince = (timestamp: string) => {
@@ -286,6 +323,12 @@ export default function HelperPage() {
 
     return (
     <div className={styles.container}>
+      {/* Toast for SOS cancel/acknowledge */}
+      {showCancelToast && (
+        <div style={{ position: 'fixed', top: 20, left: 0, right: 0, zIndex: 9999 }}>
+          <Toast message={toastMsg} onClose={() => setShowCancelToast(false)} />
+        </div>
+      )}
       <Modal isOpen={showWelcome} onClose={() => setShowWelcome(false)} title="Welcome to Najik Helper Dashboard!">
         <div className="flex flex-col items-center justify-center gap-4">
           <p className="text-base text-gray-700">This dashboard helps you monitor and assist your connected parents in real time.</p>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useLocationSharing } from '@/hooks/useGeolocation';
@@ -11,6 +11,7 @@ import Button from '@/components/Button/Button';
 import StatusIndicator from '@/components/StatusIndicator/StatusIndicator';
 import BatteryIndicator from '@/components/BatteryIndicator/BatteryIndicator';
 import Loading from '@/components/Loading/Loading';
+import Toast from '@/components/Toast/Toast';
 import styles from './parent.module.css';
 import { prisma } from '@/lib/prisma/client';
 
@@ -27,7 +28,10 @@ export default function ParentPage() {
     stopSharing,
   } = useLocationSharing();
   const { triggerSOS, cancelSOS } = useSOS(user?.id || '');
-  const { sosActive } = useSOSPolling(user?.id || '');
+  const { sosActive, alertId } = useSOSPolling(user?.id || '');
+  // Track if SOS was previously active
+  const [wasSOSActive, setWasSOSActive] = useState(false);
+  const [showCancelToast, setShowCancelToast] = useState(false);
   const { requestWakeLock, releaseWakeLock, isLocked: wakeLockActive } = useWakeLock();
   
   const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
@@ -77,6 +81,23 @@ export default function ParentPage() {
       router.push('/auth/login');
     }
   }, [user, authLoading, router]);
+
+  // Auto-cancel SOS if helper acknowledges
+  useEffect(() => {
+    if (wasSOSActive && alertId === null) {
+      // SOS was active, now cancelled by helper
+      cancelSOS();
+      stopSharing();
+      releaseWakeLock();
+      setShowCancelToast(true);
+      setWasSOSActive(false);
+    } else if (sosActive) {
+      setWasSOSActive(true);
+      // Alarm is managed by useSOS, no manual audio logic needed
+    } else {
+      // Alarm is managed by useSOS, no manual audio logic needed
+    }
+  }, [sosActive, alertId, wasSOSActive, cancelSOS, stopSharing, releaseWakeLock]);
 
   // Get battery level
   useEffect(() => {
@@ -199,6 +220,12 @@ export default function ParentPage() {
 
   return (
     <div className={styles.container}>
+      {/* Toast for SOS cancelled by helper */}
+      {showCancelToast && (
+        <div style={{ position: 'fixed', top: 20, left: 0, right: 0, zIndex: 9999 }}>
+          <Toast message="SOS cancelled by helper" type="success" onClose={() => setShowCancelToast(false)} />
+        </div>
+      )}
       {/* Add Helper UI */}
       <section className={styles.addHelperSection}>
         <h2>Add a Helper</h2>
