@@ -1,27 +1,51 @@
-import { NextAuthOptions } from "next-auth";
+import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import CredentialsProvider from "next-auth/providers/credentials";
+import bcrypt from "bcrypt";
+import { prisma } from "@/lib/prisma/client";
 
-export const authOptions: NextAuthOptions = {
+export const authOptions = {
+  adapter: PrismaAdapter(prisma),
   providers: [
     CredentialsProvider({
       name: "Credentials",
       credentials: {
         email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" }
+        password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        // TODO: Replace with Supabase auth logic
-        if (credentials?.email === "test@example.com" && credentials?.password === "password") {
-          return { id: "1", name: "Test User", email: "test@example.com" };
-        }
-        return null;
-      }
-    })
+        if (!credentials?.email || !credentials?.password) return null;
+        const user = await prisma.users.findUnique({
+          where: { email: credentials.email },
+        });
+        if (!user || !user.password) return null;
+        const isValid = await bcrypt.compare(credentials.password, user.password);
+        if (!isValid) return null;
+        return user;
+      },
+    }),
   ],
   session: {
-    strategy: "jwt"
+    strategy: "jwt" as const,
+  },
+  callbacks: {
+    async session({ session, token, user }: { session: any; token: any; user: any }) {
+      if (session.user) {
+        session.user.id = token.sub;
+        session.user.role = token.role;
+      }
+      return session;
+    },
+    async jwt({ token, user }: { token: any; user?: any }) {
+      if (user) {
+        token.role = user.role;
+      }
+      return token;
+    },
   },
   pages: {
-    signIn: "/auth/login"
-  }
+    signIn: "/auth/login",
+    signOut: "/auth/logout",
+    error: "/auth/login",
+  },
+  secret: process.env.NEXTAUTH_SECRET,
 };
