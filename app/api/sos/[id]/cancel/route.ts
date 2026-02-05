@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import type { RouteContext } from 'next';
 import { prisma } from '@/lib/prisma/server';
 
-export async function POST(req: NextRequest, context: RouteContext) {
+export async function POST(
+  req: NextRequest,
+  context: { params: { id: string } }
+) {
   try {
     const alertId = context.params.id;
     if (!alertId) {
