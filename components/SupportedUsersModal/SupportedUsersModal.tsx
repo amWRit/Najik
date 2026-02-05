@@ -46,14 +46,18 @@ const SupportedUsersModal: React.FC<SupportedUsersModalProps> = ({ open, support
       <div className="bg-white rounded-lg shadow-lg p-6 w-80">
         <h2 className="text-lg font-semibold mb-4">Supported Users</h2>
         <ul className="mb-4">
-          {supportedUsers.map(user => (
-            <li key={user.email} className="flex items-center justify-between py-2 border-b">
-              <span>{user.name} <span className="text-gray-500">({user.email})</span></span>
-              {onDelete && (
-                <button className="text-red-500 ml-2" onClick={() => onDelete(user.email)}>Delete</button>
-              )}
-            </li>
-          ))}
+          {supportedUsers.length === 0 ? (
+            <li className="text-gray-500 py-2">No supported users yet.</li>
+          ) : (
+            supportedUsers.map(user => (
+              <li key={user.email} className="flex items-center justify-between py-2 border-b">
+                <span>{user.name} <span className="text-gray-500">({user.email})</span></span>
+                {onDelete && (
+                  <button className="text-red-500 ml-2" onClick={() => onDelete(user.email)}>Delete</button>
+                )}
+              </li>
+            ))
+          )}
         </ul>
         <button className="w-full py-2 px-3 bg-blue-500 text-white rounded mb-2" onClick={() => setShowAddModal(true)}>
           Add Supported User

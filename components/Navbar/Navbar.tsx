@@ -33,8 +33,6 @@ const Navbar: React.FC<NavbarProps> = ({
   const [showAddSupporterModal, setShowAddSupporterModal] = React.useState(false);
   const [addSupporterEmail, setAddSupporterEmail] = React.useState('');
   const [addSupporterStatus, setAddSupporterStatus] = React.useState<string | null>(null);
-  // For helper: supported users list
-  const [supportedUsers, setSupportedUsers] = React.useState<{ name: string; email: string }[]>([]);
 
   const handleSettingsClick = () => {
     if (onSettingsClick) {
@@ -47,20 +45,6 @@ const Navbar: React.FC<NavbarProps> = ({
 
   const handleOpenSupportersModal = async () => {
     setShowSettingsMenu(false);
-    if (userRole === 'helper' && userId) {
-      // Fetch supported users for helper
-      try {
-        const res = await fetch(`/api/relationship/parents?helper_id=${userId}`);
-        const data = await res.json();
-        if (Array.isArray(data.parents)) {
-          setSupportedUsers(data.parents.map((p: any) => ({ name: p.name, email: p.email })));
-        } else {
-          setSupportedUsers([]);
-        }
-      } catch {
-        setSupportedUsers([]);
-      }
-    }
     setShowSupportersModal(true);
   };
   const handleCloseSupportersModal = () => setShowSupportersModal(false);
@@ -123,7 +107,7 @@ const Navbar: React.FC<NavbarProps> = ({
       {userRole === 'helper' && (
         <SupportedUsersModal
           open={showSupportersModal}
-          supportedUsers={supportedUsers}
+          supportedUsers={[]}
           helperId={userId}
           helperName={userName}
           onClose={handleCloseSupportersModal}

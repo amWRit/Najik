@@ -18,6 +18,7 @@ import Toast from '@/components/Toast/Toast';
 import Navbar from '@/components/Navbar/Navbar';
 import styles from './helper.module.css';
 import dynamic from 'next/dynamic';
+import SupportedUsersModal from '@/components/SupportedUsersModal/SupportedUsersModal';
 
 // Dynamically import Map component (client-side only)
 const Map = dynamic(() => import('@/components/Map/Map'), { ssr: false });
@@ -35,6 +36,10 @@ export default function HelperPage() {
     const [toastMsg, setToastMsg] = useState('');
     // Welcome modal state
     const [showWelcome, setShowWelcome] = useState(true);
+    // Settings modal state
+    const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+    // Supported users modal state
+    const [showSupportedUsersModal, setShowSupportedUsersModal] = useState(false);
     // Unlock audio context on first user interaction
     useEffect(() => {
       let ctx: AudioContext | null = null;
@@ -57,6 +62,8 @@ export default function HelperPage() {
       };
     }, []);
     const [parentUsers, setParentUsers] = useState<{id: string, name: string, email: string}[]>([]);
+    // For SupportedUsersModal
+    const supportedUsers = parentUsers.map(p => ({ name: p.name, email: p.email }));
     const [selectedParent, setSelectedParent] = useState<User | null>(null);
     // New state for latest location update
     const [latestLocation, setLatestLocation] = useState<LocationUpdate | null>(null);
@@ -348,6 +355,32 @@ export default function HelperPage() {
           userRole="helper"
           userName={user.name ?? undefined}
           onSignOut={signOut}
+          onSettingsClick={() => setShowSettingsMenu(true)}
+        />
+        {/* Settings Menu Modal */}
+        {showSettingsMenu && (
+          <div className="fixed inset-0 bg-black bg-opacity-30 z-50 flex items-center justify-center">
+            <div className="bg-white rounded-lg shadow-lg p-6 w-80">
+              <h2 className="text-lg font-semibold mb-4">Settings</h2>
+              <button className="w-full text-left py-2 px-3 hover:bg-gray-100 rounded" onClick={() => { setShowSupportedUsersModal(true); setShowSettingsMenu(false); }}>
+                Supported Users
+              </button>
+              <button className="w-full text-left py-2 px-3 hover:bg-gray-100 rounded mt-2" onClick={signOut}>
+                Sign Out
+              </button>
+              <button className="w-full text-left py-2 px-3 hover:bg-gray-100 rounded mt-2" onClick={() => setShowSettingsMenu(false)}>
+                Close
+              </button>
+            </div>
+          </div>
+        )}
+        {/* Supported Users Modal */}
+        <SupportedUsersModal
+          open={showSupportedUsersModal}
+          supportedUsers={supportedUsers}
+          helperId={user.id}
+          helperName={user.name ?? undefined}
+          onClose={() => setShowSupportedUsersModal(false)}
         />
         <div className={styles.layout}>
         {/* Sidebar - Parents List */}
