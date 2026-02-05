@@ -19,8 +19,7 @@ import SupportersModal from '@/components/SupportersModal/SupportersModal';
 import AddSupporterModal from '@/components/AddSupporterModal/AddSupporterModal';
 
 export default function ParentPage() {
-  const [addHelperEmail, setAddHelperEmail] = useState("");
-  const [addHelperStatus, setAddHelperStatus] = useState<string | null>(null);
+  // ...existing code...
   const router = useRouter();
   const { user, loading: authLoading, signOut } = useAuth();
   const {
@@ -248,52 +247,7 @@ export default function ParentPage() {
   };
   const handleCloseHelpersModal = () => setShowHelpersModal(false);
 
-  // Handler for add helper modal
-  const handleOpenAddHelperModal = () => setShowAddHelperModal(true);
-  const handleCloseAddHelperModal = () => setShowAddHelperModal(false);
-
-  // Add supporter logic (API call)
-  const handleAddHelper = async (email: string) => {
-    setAddHelperStatus(null);
-    if (!email) {
-      setAddHelperStatus('Please enter an email.');
-      return;
-    }
-    if (!user || !user.id) {
-      setAddHelperStatus('❌ User not found. Please log in again.');
-      return;
-    }
-    try {
-      const res = await fetch('/api/relationship/add', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ parent_id: user.id, helper_email: email }),
-      });
-      const result = await res.json();
-      if (result.success) {
-        setHelpers([...helpers, email]);
-        setAddHelperStatus('✅ Supporter added successfully!');
-        setAddHelperEmail('');
-        setShowAddHelperModal(false);
-      } else {
-        switch (res.status) {
-          case 400:
-            setAddHelperStatus('❌ Missing parent ID or supporter email.');
-            break;
-          case 404:
-            setAddHelperStatus('❌ Supporter not found or not a helper. Please check the email and role.');
-            break;
-          case 409:
-            setAddHelperStatus('⚠️ Relationship already exists.');
-            break;
-          default:
-            setAddHelperStatus(result.error ? `❌ ${result.error}` : '❌ Failed to add supporter.');
-        }
-      }
-    } catch (err) {
-      setAddHelperStatus('❌ Network or server error while adding supporter.');
-    }
-  };
+  // ...existing code...
 
   // Delete supporter logic (API call)
   const handleDeleteHelper = async (email: string) => {
@@ -348,18 +302,10 @@ export default function ParentPage() {
       <SupportersModal
         open={showHelpersModal}
         supporters={helpers}
+        parentId={user?.id}
         onDelete={handleDeleteHelper}
-        onAdd={handleOpenAddHelperModal}
         onClose={handleCloseHelpersModal}
-      />
-      {/* Add Supporter Modal */}
-      <AddSupporterModal
-        open={showAddHelperModal}
-        email={addHelperEmail}
-        status={addHelperStatus}
-        onEmailChange={setAddHelperEmail}
-        onAdd={() => handleAddHelper(addHelperEmail)}
-        onClose={handleCloseAddHelperModal}
+        setHelpers={setHelpers}
       />
       {/* Add Helper UI - removed, logic moved to Add Supporter modal */}
       <header className={styles.header}>

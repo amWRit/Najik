@@ -2,6 +2,7 @@ import React from 'react';
 import { Settings } from 'lucide-react';
 import IconButton from '../Button/IconButton';
 import SupportersModal from '@/components/SupportersModal/SupportersModal';
+import SupportedUsersModal from '@/components/SupportedUsersModal/SupportedUsersModal';
 import AddSupporterModal from '@/components/AddSupporterModal/AddSupporterModal';
 
 interface NavbarProps {
@@ -9,6 +10,7 @@ interface NavbarProps {
   userRole?: 'parent' | 'helper';
   onSettingsClick?: () => void;
   userName?: string;
+  userId?: string;
   supporters?: string[];
   onDeleteSupporter?: (email: string) => void;
   onAddSupporter?: (email: string) => void;
@@ -19,6 +21,7 @@ const Navbar: React.FC<NavbarProps> = ({
   title,
   userRole,
   userName,
+  userId,
   supporters = [],
   onDeleteSupporter,
   onAddSupporter,
@@ -30,6 +33,8 @@ const Navbar: React.FC<NavbarProps> = ({
   const [showAddSupporterModal, setShowAddSupporterModal] = React.useState(false);
   const [addSupporterEmail, setAddSupporterEmail] = React.useState('');
   const [addSupporterStatus, setAddSupporterStatus] = React.useState<string | null>(null);
+  // For helper: supported users list
+  const [supportedUsers, setSupportedUsers] = React.useState<{ name: string; email: string }[]>([]);
 
   const handleSettingsClick = () => {
     if (onSettingsClick) {
@@ -40,9 +45,23 @@ const Navbar: React.FC<NavbarProps> = ({
   };
   const handleCloseSettingsMenu = () => setShowSettingsMenu(false);
 
-  const handleOpenSupportersModal = () => {
-    setShowSupportersModal(true);
+  const handleOpenSupportersModal = async () => {
     setShowSettingsMenu(false);
+    if (userRole === 'helper' && userId) {
+      // Fetch supported users for helper
+      try {
+        const res = await fetch(`/api/relationship/parents?helper_id=${userId}`);
+        const data = await res.json();
+        if (Array.isArray(data.parents)) {
+          setSupportedUsers(data.parents.map((p: any) => ({ name: p.name, email: p.email })));
+        } else {
+          setSupportedUsers([]);
+        }
+      } catch {
+        setSupportedUsers([]);
+      }
+    }
+    setShowSupportersModal(true);
   };
   const handleCloseSupportersModal = () => setShowSupportersModal(false);
 
@@ -92,23 +111,35 @@ const Navbar: React.FC<NavbarProps> = ({
           </div>
         </div>
       )}
-      {/* Supporters/Supported Users Modal */}
-      <SupportersModal
-        open={showSupportersModal}
-        supporters={supporters}
-        onDelete={onDeleteSupporter || (() => {})}
-        onAdd={handleOpenAddSupporterModal}
-        onClose={handleCloseSupportersModal}
-      />
-      {/* Add Supporter Modal */}
-      <AddSupporterModal
-        open={showAddSupporterModal}
-        email={addSupporterEmail}
-        status={addSupporterStatus}
-        onEmailChange={setAddSupporterEmail}
-        onAdd={handleAddSupporter}
-        onClose={handleCloseAddSupporterModal}
-      />
+      {/* Supporters Modal for parent, SupportedUsersModal for helper */}
+      {userRole === 'parent' && (
+        <SupportersModal
+          open={showSupportersModal}
+          supporters={supporters}
+          onDelete={onDeleteSupporter || (() => {})}
+          onClose={handleCloseSupportersModal}
+        />
+      )}
+      {userRole === 'helper' && (
+        <SupportedUsersModal
+          open={showSupportersModal}
+          supportedUsers={supportedUsers}
+          helperId={userId}
+          helperName={userName}
+          onClose={handleCloseSupportersModal}
+        />
+      )}
+      {/* Add Supporter Modal for parent */}
+      {userRole === 'parent' && (
+        <AddSupporterModal
+          open={showAddSupporterModal}
+          email={addSupporterEmail}
+          status={addSupporterStatus}
+          onEmailChange={setAddSupporterEmail}
+          onAdd={handleAddSupporter}
+          onClose={handleCloseAddSupporterModal}
+        />
+      )}
     </nav>
   );
 };
