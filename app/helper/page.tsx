@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParentSOSPolling } from '@/hooks/useParentSOSPolling';
+// import { useParentSOSPolling } from '@/hooks/useParentSOSPolling';
+import { useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useRealtimeSubscription } from '@/hooks/useRealtime';
@@ -11,6 +12,7 @@ import Card from '@/components/Card/Card';
 import StatusIndicator from '@/components/StatusIndicator/StatusIndicator';
 import BatteryIndicator from '@/components/BatteryIndicator/BatteryIndicator';
 import Loading from '@/components/Loading/Loading';
+import Modal from '@/components/Modal/Modal';
 import dynamic from 'next/dynamic';
 import styles from './helper.module.css';
 
@@ -25,6 +27,29 @@ interface ParentStatus {
 }
 
 export default function HelperPage() {
+          // Welcome modal state
+          const [showWelcome, setShowWelcome] = useState(true);
+        // Unlock audio context on first user interaction
+        useEffect(() => {
+          let ctx: AudioContext | null = null;
+          const unlockAudio = () => {
+            try {
+              ctx = window.AudioContext ? new window.AudioContext() : (window as any).webkitAudioContext && new (window as any).webkitAudioContext();
+              if (ctx && ctx.state === 'suspended') {
+                ctx.resume();
+              }
+            } catch {}
+            window.removeEventListener('pointerdown', unlockAudio);
+            window.removeEventListener('keydown', unlockAudio);
+          };
+          window.addEventListener('pointerdown', unlockAudio);
+          window.addEventListener('keydown', unlockAudio);
+          return () => {
+            window.removeEventListener('pointerdown', unlockAudio);
+            window.removeEventListener('keydown', unlockAudio);
+            if (ctx) ctx.close();
+          };
+        }, []);
     const [parentUsers, setParentUsers] = useState<{id: string, name: string, email: string}[]>([]);
     const [selectedParent, setSelectedParent] = useState<User | null>(null);
     // New state for latest location update
@@ -54,23 +79,69 @@ export default function HelperPage() {
       fetchLatest();
     }, [selectedParent]);
   
-    // Auto-select first parent when parentUsers is loaded
-    useEffect(() => {
-      if (parentUsers.length > 0 && !selectedParent) {
-        setSelectedParent({
-          id: parentUsers[0].id,
-          name: parentUsers[0].name,
-          email: parentUsers[0].email,
-        } as User);
-      }
-    }, [parentUsers, selectedParent]);
+    // Manual selection only: do not auto-select parent
     // Track sharing status for each parent
     const [parentSharing, setParentSharing] = useState<Record<string, boolean>>({});
   // (Test click handler removed)
   // Selected parent info for display
   const [selectedParentInfo, setSelectedParentInfo] = useState<ParentStatus | null>(null);
-  // SOS polling for selected parent
-  const { sosActive: parentSOSActive } = useParentSOSPolling(selectedParent?.id || '');
+    // SOS polling for all parents
+    const [sosAlertsState, setSosAlertsState] = useState<Record<string, SOSAlert | null>>({});
+    const audioRef = useRef<HTMLAudioElement | null>(null);
+
+    useEffect(() => {
+      if (!parentUsers.length) return;
+      let polling = true;
+      const pollSOS = async () => {
+        const newSosAlerts: Record<string, SOSAlert | null> = {};
+        let anyActiveSOS = false;
+        for (const parent of parentUsers) {
+          try {
+            const res = await fetch(`/api/sos/latest?userId=${parent.id}`);
+            if (res.ok) {
+              const data = await res.json();
+              if (data && data.is_active) {
+                newSosAlerts[parent.id] = data;
+                anyActiveSOS = true;
+              } else {
+                newSosAlerts[parent.id] = null;
+              }
+            } else {
+              newSosAlerts[parent.id] = null;
+            }
+          } catch {
+            newSosAlerts[parent.id] = null;
+          }
+        }
+        setSosAlertsState(newSosAlerts);
+        // Play sound if any SOS active
+        if (anyActiveSOS) {
+          if (!audioRef.current) {
+            const audio = new Audio('/sounds/sos-alarm.mp3');
+            audio.loop = true;
+            audio.volume = 1.0;
+            audio.play().catch(() => {});
+            audioRef.current = audio;
+          }
+        } else {
+          if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = 0;
+            audioRef.current = null;
+          }
+        }
+        if (polling) setTimeout(pollSOS, 3000);
+      };
+      pollSOS();
+      return () => {
+        polling = false;
+        if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current.currentTime = 0;
+          audioRef.current = null;
+        }
+      };
+    }, [parentUsers]);
   const router = useRouter();
   const { user, loading: authLoading, signOut } = useAuth();
   const [parents, setParents] = useState<ParentStatus[]>([]);
@@ -152,21 +223,10 @@ export default function HelperPage() {
     setSelectedParentInfo({
       user: selectedParent,
       lastLocation,
-      sosAlert: parentSOSActive
-        ? {
-            id: 'active',
-            user_id: selectedParent.id,
-            latitude: 0,
-            longitude: 0,
-            timestamp: new Date().toISOString(),
-            acknowledged_at: null,
-            acknowledged_by: null,
-            is_active: true,
-          }
-        : null,
+      sosAlert: sosAlertsState[selectedParent.id] || null,
       isSharing: !!parentSharing[selectedParent.id],
     });
-  }, [selectedParent, locationUpdates, parentSharing, latestLocation, parentSOSActive]);
+  }, [selectedParent, locationUpdates, parentSharing, latestLocation, sosAlertsState]);
 
   
   // Fetch parents and their status
@@ -224,8 +284,16 @@ export default function HelperPage() {
     return null;
   }
 
-  return (
+    return (
     <div className={styles.container}>
+      <Modal isOpen={showWelcome} onClose={() => setShowWelcome(false)} title="Welcome to Najik Helper Dashboard!">
+        <div className="flex flex-col items-center justify-center gap-4">
+          <p className="text-base text-gray-700">This dashboard helps you monitor and assist your connected parents in real time.</p>
+          <Button size="large" variant="primary" onClick={() => setShowWelcome(false)}>
+            OK
+          </Button>
+        </div>
+      </Modal>
       {/* Main header only, temp duplicate removed */}
       <header className={styles.header}>
         <div className={styles.headerTop}>
@@ -289,32 +357,34 @@ export default function HelperPage() {
 
         {/* Main Content - Map and Details */}
         <main className={styles.mainContent}>
+          {/* Show SOS alert for any parent with active SOS (always visible) */}
+          {Object.entries(sosAlertsState).map(([pid, alert]) =>
+            alert?.is_active ? (
+              <div key={pid} className={styles.sosAlert}>
+                <div className={styles.sosAlertContent}>
+                  <span className={styles.sosIcon}>🚨</span>
+                  <div>
+                    <h3 className={styles.sosTitle}>
+                      EMERGENCY from {parentUsers.find(p => p.id === pid)?.name || 'Unknown'}
+                    </h3>
+                    <p className={styles.sosTime}>
+                      {alert.timestamp ? new Date(alert.timestamp).toLocaleString() : ''}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="success"
+                  size="medium"
+                  onClick={() => handleAcknowledgeSOS(alert.id)}
+                >
+                  ✓ Acknowledge SOS
+                </Button>
+              </div>
+            ) : null
+          )}
+
           {selectedParentInfo ? (
             <>
-              {/* SOS Alert Banner */}
-              {selectedParentInfo.sosAlert?.is_active && (
-                <div className={styles.sosAlert}>
-                  <div className={styles.sosAlertContent}>
-                    <span className={styles.sosIcon}>🚨</span>
-                    <div>
-                      <h3 className={styles.sosTitle}>
-                        EMERGENCY from {selectedParentInfo.user.name}
-                      </h3>
-                      <p className={styles.sosTime}>
-                        {selectedParentInfo.sosAlert.timestamp ? new Date(selectedParentInfo.sosAlert.timestamp).toLocaleString() : ''}
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    variant="success"
-                    size="medium"
-                    onClick={() => handleAcknowledgeSOS(selectedParentInfo.sosAlert!.id)}
-                  >
-                    ✓ Acknowledge SOS
-                  </Button>
-                </div>
-              )}
-
               {/* Map */}
               {selectedParentInfo.lastLocation ? (
                 <div className={styles.mapContainer}>
@@ -332,13 +402,15 @@ export default function HelperPage() {
                   />
                 </div>
               ) : (
-                <Card>
-                  <div className={styles.noLocation}>
-                    <span className={styles.noLocationIcon}>📍</span>
-                    <h3>No Location Data</h3>
-                    <p>{selectedParentInfo.user.name} hasn't shared their location yet.</p>
-                  </div>
-                </Card>
+                parentLoading || !selectedParent ? null : (
+                  <Card>
+                    <div className={styles.noLocation}>
+                      <span className={styles.noLocationIcon}>📍</span>
+                      <h3>No Location Data</h3>
+                      <p>{selectedParentInfo.user.name} hasn't shared their location yet.</p>
+                    </div>
+                  </Card>
+                )
               )}
 
               {/* Location Details */}

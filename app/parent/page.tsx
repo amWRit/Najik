@@ -32,6 +32,7 @@ export default function ParentPage() {
   
   const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
   const [helperName, setHelperName] = useState<string>('your helper');
+  const [lastUpdateTime, setLastUpdateTime] = useState<string | null>(null);
 
   // Periodically send location to backend while sharing
   useEffect(() => {
@@ -181,6 +182,12 @@ export default function ParentPage() {
       }
     }
   }, [user, sosActive, cancelSOS, triggerSOS, isSharing, handleStartSharing, stopSharing, releaseWakeLock]);
+
+  useEffect(() => {
+    if (lastUpdate && typeof window !== 'undefined') {
+      setLastUpdateTime(new Date(lastUpdate.timestamp).toLocaleTimeString());
+    }
+  }, [lastUpdate]);
 
   if (authLoading) {
     return <Loading size="large" text="Loading..." />;
@@ -364,10 +371,10 @@ export default function ParentPage() {
           </div>
         )}
 
-        {lastUpdate && (
+        {lastUpdate && lastUpdateTime && (
           <div className={styles.infoBox}>
             <span>✓</span>
-            <span>Last updated: {new Date(lastUpdate.timestamp).toLocaleTimeString()}</span>
+            <span>Last updated: {lastUpdateTime}</span>
           </div>
         )}
       </main>
