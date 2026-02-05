@@ -28,32 +28,32 @@ interface ParentStatus {
 }
 
 export default function HelperPage() {
-            // Toast for cancel/acknowledge
-            const [showCancelToast, setShowCancelToast] = useState(false);
-            const [toastMsg, setToastMsg] = useState('');
-          // Welcome modal state
-          const [showWelcome, setShowWelcome] = useState(true);
-        // Unlock audio context on first user interaction
-        useEffect(() => {
-          let ctx: AudioContext | null = null;
-          const unlockAudio = () => {
-            try {
-              ctx = window.AudioContext ? new window.AudioContext() : (window as any).webkitAudioContext && new (window as any).webkitAudioContext();
-              if (ctx && ctx.state === 'suspended') {
-                ctx.resume();
-              }
-            } catch {}
-            window.removeEventListener('pointerdown', unlockAudio);
-            window.removeEventListener('keydown', unlockAudio);
-          };
-          window.addEventListener('pointerdown', unlockAudio);
-          window.addEventListener('keydown', unlockAudio);
-          return () => {
-            window.removeEventListener('pointerdown', unlockAudio);
-            window.removeEventListener('keydown', unlockAudio);
-            if (ctx) ctx.close();
-          };
-        }, []);
+    // Toast for cancel/acknowledge
+    const [showCancelToast, setShowCancelToast] = useState(false);
+    const [toastMsg, setToastMsg] = useState('');
+    // Welcome modal state
+    const [showWelcome, setShowWelcome] = useState(true);
+    // Unlock audio context on first user interaction
+    useEffect(() => {
+      let ctx: AudioContext | null = null;
+      const unlockAudio = () => {
+        try {
+          ctx = window.AudioContext ? new window.AudioContext() : (window as any).webkitAudioContext && new (window as any).webkitAudioContext();
+          if (ctx && ctx.state === 'suspended') {
+            ctx.resume();
+          }
+        } catch {}
+        window.removeEventListener('pointerdown', unlockAudio);
+        window.removeEventListener('keydown', unlockAudio);
+      };
+      window.addEventListener('pointerdown', unlockAudio);
+      window.addEventListener('keydown', unlockAudio);
+      return () => {
+        window.removeEventListener('pointerdown', unlockAudio);
+        window.removeEventListener('keydown', unlockAudio);
+        if (ctx) ctx.close();
+      };
+    }, []);
     const [parentUsers, setParentUsers] = useState<{id: string, name: string, email: string}[]>([]);
     const [selectedParent, setSelectedParent] = useState<User | null>(null);
     // New state for latest location update
@@ -86,12 +86,14 @@ export default function HelperPage() {
     // Manual selection only: do not auto-select parent
     // Track sharing status for each parent
     const [parentSharing, setParentSharing] = useState<Record<string, boolean>>({});
-  // (Test click handler removed)
-  // Selected parent info for display
-  const [selectedParentInfo, setSelectedParentInfo] = useState<ParentStatus | null>(null);
+    // (Test click handler removed)
+    // Selected parent info for display
+    const [selectedParentInfo, setSelectedParentInfo] = useState<ParentStatus | null>(null);
     // SOS polling for all parents
     const [sosAlertsState, setSosAlertsState] = useState<Record<string, SOSAlert | null>>({});
     const audioRef = useRef<HTMLAudioElement | null>(null);
+    // Track acknowledging state for each SOS alert
+    const [acknowledging, setAcknowledging] = useState<Record<string, boolean>>({});
 
     useEffect(() => {
       if (!parentUsers.length) return;
@@ -263,6 +265,7 @@ export default function HelperPage() {
 
   const handleAcknowledgeSOS = async (alertId: string) => {
     if (!user) return;
+    setAcknowledging((prev) => ({ ...prev, [alertId]: true }));
     try {
       const res = await fetch(`/api/sos/${alertId}/update`, {
         method: 'PATCH',
@@ -303,6 +306,8 @@ export default function HelperPage() {
       }
       setToastMsg('Network error while acknowledging SOS');
       setShowCancelToast(true);
+    } finally {
+      setAcknowledging((prev) => ({ ...prev, [alertId]: false }));
     }
   };
 
@@ -417,8 +422,9 @@ export default function HelperPage() {
                   variant="success"
                   size="medium"
                   onClick={() => handleAcknowledgeSOS(alert.id)}
+                  disabled={!!acknowledging[alert.id]}
                 >
-                  ✓ Acknowledge SOS
+                  {acknowledging[alert.id] ? 'Acknowledging...' : '✓ Acknowledge SOS'}
                 </Button>
               </div>
             ) : null
