@@ -3,10 +3,10 @@ import { prisma } from '@/lib/prisma/server';
 
 export async function POST(
   req: NextRequest,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const alertId = context.params.id;
+    const { id: alertId } = await context.params;
     if (!alertId) {
       return NextResponse.json({ error: 'Missing alertId' }, { status: 400 });
     }
