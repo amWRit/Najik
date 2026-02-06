@@ -19,30 +19,55 @@ export async function GET(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const { helper_id, parent_email } = await req.json();
-    if (!helper_id || !parent_email) {
-      return NextResponse.json({ error: 'Missing helper_id or parent_email' }, { status: 400 });
+    const body = await req.json();
+    // Helper-side: { helper_id, parent_email }
+    if (body.helper_id && body.parent_email) {
+      // Find parent user by email
+      const parent = await prisma.users.findUnique({
+        where: { email: body.parent_email },
+        select: { id: true },
+      });
+      if (!parent) {
+        return NextResponse.json({ error: 'Parent not found' }, { status: 404 });
+      }
+      // Delete the relationship
+      const deleted = await prisma.relationships.deleteMany({
+        where: {
+          helper_id: body.helper_id,
+          parent_id: parent.id,
+        },
+      });
+      if (deleted.count > 0) {
+        return NextResponse.json({ success: true });
+      } else {
+        return NextResponse.json({ error: 'Relationship not found' }, { status: 404 });
+      }
     }
-    // Find parent user by email
-    const parent = await prisma.users.findUnique({
-      where: { email: parent_email },
-      select: { id: true },
-    });
-    if (!parent) {
-      return NextResponse.json({ error: 'Parent not found' }, { status: 404 });
+    // Parent-side: { parent_id, helper_email }
+    if (body.parent_id && body.helper_email) {
+      // Find helper user by email
+      const helper = await prisma.users.findUnique({
+        where: { email: body.helper_email },
+        select: { id: true },
+      });
+      if (!helper) {
+        return NextResponse.json({ error: 'Helper not found' }, { status: 404 });
+      }
+      // Delete the relationship
+      const deleted = await prisma.relationships.deleteMany({
+        where: {
+          parent_id: body.parent_id,
+          helper_id: helper.id,
+        },
+      });
+      if (deleted.count > 0) {
+        return NextResponse.json({ success: true });
+      } else {
+        return NextResponse.json({ error: 'Relationship not found' }, { status: 404 });
+      }
     }
-    // Delete the relationship
-    const deleted = await prisma.relationships.deleteMany({
-      where: {
-        helper_id,
-        parent_id: parent.id,
-      },
-    });
-    if (deleted.count > 0) {
-      return NextResponse.json({ success: true });
-    } else {
-      return NextResponse.json({ error: 'Relationship not found' }, { status: 404 });
-    }
+    // If neither, return error
+    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   } catch (err) {
     return NextResponse.json({ error: 'Failed to delete relationship' }, { status: 500 });
   }

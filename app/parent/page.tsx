@@ -252,8 +252,8 @@ export default function ParentPage() {
   const handleDeleteHelper = async (email: string) => {
     if (!user || !user.id) return;
     try {
-      const res = await fetch('/api/relationship/delete', {
-        method: 'POST',
+      const res = await fetch('/api/relationship', {
+        method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ parent_id: user.id, helper_email: email }),
       });
