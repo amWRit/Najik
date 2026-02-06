@@ -381,6 +381,26 @@ export default function HelperPage() {
           helperId={user.id}
           helperName={user.name ?? undefined}
           onClose={() => setShowSupportedUsersModal(false)}
+          onDelete={async (email) => {
+            if (!user?.id) return;
+            try {
+              const res = await fetch('/api/relationship', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ helper_id: user.id, parent_email: email }),
+              });
+              if (res.ok) {
+                setParentUsers((prev) => prev.filter((u) => u.email !== email));
+              } else {
+                // Optionally show error toast
+                setToastMsg('Failed to remove supported user');
+                setShowCancelToast(true);
+              }
+            } catch {
+              setToastMsg('Network error while removing supported user');
+              setShowCancelToast(true);
+            }
+          }}
         />
         <div className={styles.layout}>
         {/* Sidebar - Parents List */}
