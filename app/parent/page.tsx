@@ -318,7 +318,11 @@ export default function ParentPage() {
             {isSharing ? (
               <StatusIndicator
                 status="sharing"
-                text={`Sharing with ${helperName}`}
+                text={
+                  helpers.length > 1
+                    ? `Sharing with ${helpers.length} helpers`
+                    : `Sharing with ${helperName}`
+                }
                 pulse
               />
             ) : sosActive ? (

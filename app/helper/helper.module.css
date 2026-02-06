@@ -20,6 +20,7 @@
   min-height: 100vh;
   background: linear-gradient(135deg, #ede9fe 0%, #e0f2fe 100%);
   padding-bottom: env(safe-area-inset-bottom);
+  padding-top: 56px; /* Add space for fixed navbar (height + margin) */
 }
 
 .header {

@@ -68,14 +68,21 @@ const Navbar: React.FC<NavbarProps> = ({
   return (
     <nav className="flex items-center justify-between px-4 py-2 bg-white shadow-md fixed top-0 left-0 w-full z-50">
       <div className="flex items-center gap-4">
-        <div className="text-lg font-semibold">{title || 'Najik'}</div>
-        {userName && (
-          <span className="text-base font-medium text-gray-700">{userName.split(' ')[0]}</span>
-        )}
+        <img
+          src="/images/logos/logo.svg"
+          alt="Najik Logo"
+          style={{ width: 36, height: 36, display: 'inline-block' }}
+        />
+        <span className="text-lg font-semibold" style={{ userSelect: 'none' }}>{title || 'Najik'}</span>
       </div>
-      <IconButton onClick={handleSettingsClick}>
-        <Settings size={24} />
-      </IconButton>
+      <div className="flex items-center gap-2">
+        {userName && (
+          <span className="text-base font-medium text-gray-700 mr-1">{userName}</span>
+        )}
+        <IconButton onClick={handleSettingsClick}>
+          <Settings size={24} />
+        </IconButton>
+      </div>
       {/* Settings Menu Modal */}
       {showSettingsMenu && (
         <div className="fixed inset-0 bg-black bg-opacity-30 z-50 flex items-center justify-center">
