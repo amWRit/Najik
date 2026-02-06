@@ -67,7 +67,12 @@ const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <nav className="flex items-center justify-between px-4 py-2 bg-white shadow-md fixed top-0 left-0 w-full z-50">
-      <div className="text-lg font-semibold">{title || 'Najik'}</div>
+      <div className="flex items-center gap-4">
+        <div className="text-lg font-semibold">{title || 'Najik'}</div>
+        {userName && (
+          <span className="text-base font-medium text-gray-700">{userName.split(' ')[0]}</span>
+        )}
+      </div>
       <IconButton onClick={handleSettingsClick}>
         <Settings size={24} />
       </IconButton>

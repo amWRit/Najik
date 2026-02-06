@@ -279,7 +279,12 @@ export default function ParentPage() {
 
   return (
     <div className="pt-16">
-      <Navbar onSettingsClick={handleSettingsClick} title="Najik" onSignOut={signOut} />
+      <Navbar
+        onSettingsClick={handleSettingsClick}
+        title="Najik"
+        onSignOut={signOut}
+        userName={user.name ?? undefined}
+      />
       {/* Settings Menu Modal */}
       {showSettingsMenu && (
         <div className="fixed inset-0 bg-black bg-opacity-30 z-50 flex items-center justify-center">
@@ -306,40 +311,46 @@ export default function ParentPage() {
         onClose={handleCloseHelpersModal}
         setHelpers={setHelpers}
       />
-      {/* Add Helper UI - removed, logic moved to Add Supporter modal */}
-      <header className={styles.header}>
-        <div className={styles.headerTop}>
-          <h1 className={styles.title}>Najik</h1>
-        </div>
-        <p className={styles.subtitle}>Hello, {user?.name}!</p>
-      </header>
-
       <main className={styles.main}>
         {/* Status Display */}
         <div className={styles.statusCard}>
-          {isSharing && (
-            <StatusIndicator
-              status="sharing"
-              text={`Sharing with ${helperName}`}
-              pulse
-            />
-          )}
-          {sosActive && (
-            <StatusIndicator
-              status="sos"
-              text="🚨 SOS ACTIVE - Help is notified"
-              pulse
-            />
-          )}
-          {!isSharing && !sosActive && (
-            <StatusIndicator status="offline" text="Not sharing location" />
-          )}
-          
-          {batteryLevel !== null && (
-            <div className={styles.batteryContainer}>
-              <BatteryIndicator level={batteryLevel} size="large" />
-            </div>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'space-between', width: '100%', padding: '2px 0', minHeight: 0 }}>
+            {isSharing ? (
+              <StatusIndicator
+                status="sharing"
+                text={`Sharing with ${helperName}`}
+                pulse
+              />
+            ) : sosActive ? (
+              <StatusIndicator
+                status="sos"
+                text="🚨 SOS ACTIVE - Help is notified"
+                pulse
+              />
+            ) : (
+              <StatusIndicator status="offline" text="Not sharing location" />
+            )}
+            {batteryLevel !== null && (
+              <span style={{
+                marginLeft: 8,
+                display: 'inline-flex',
+                alignItems: 'center',
+                background: 'var(--color-card-bg, #f3f4f6)',
+                borderRadius: '999px',
+                padding: '4px 14px',
+                fontSize: '1.25em', // Increased font size
+                fontWeight: 600,
+                color: '#374151',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                border: '1px solid #e5e7eb',
+                minWidth: 0
+              }}>
+                <span style={{ display: 'flex', alignItems: 'center', fontSize: '1.5em', marginRight: 6 }}>
+                  <BatteryIndicator level={batteryLevel} size="large" />
+                </span>
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Error Display */}
