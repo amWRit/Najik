@@ -28,10 +28,19 @@ const SupportersModal: React.FC<SupportersModalProps> = ({ open, supporters, par
       return;
     }
     try {
+      // Fetch helper user by email to get helper_id
+      const helperRes = await fetch(`/api/user/email?email=${encodeURIComponent(email)}`);
+      const helperData = await helperRes.json();
+      if (!helperRes.ok || !helperData.user || !helperData.user.id) {
+        setStatus(helperData.error ? `❌ ${helperData.error}` : '❌ Helper not found.');
+        return;
+      }
+      const helper_id = helperData.user.id;
+      // Send relationship add request with parent_id and helper_id
       const res = await fetch('/api/relationship/add', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ parent_id: parentId, helper_email: email }),
+        body: JSON.stringify({ parent_id: parentId, helper_id }),
       });
       const result = await res.json();
       if (result.success) {
@@ -42,10 +51,10 @@ const SupportersModal: React.FC<SupportersModalProps> = ({ open, supporters, par
       } else {
         switch (res.status) {
           case 400:
-            setStatus('❌ Missing parent ID or supporter email.');
+            setStatus('❌ Missing parent ID or helper ID.');
             break;
           case 404:
-            setStatus('❌ Supporter not found or not a helper. Please check the email and role.');
+            setStatus('❌ Helper not found or not a helper. Please check the email and role.');
             break;
           case 409:
             setStatus('⚠️ Relationship already exists.');

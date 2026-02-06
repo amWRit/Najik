@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import AddSupportedUserModal from './AddSupportedUserModal';
 
 interface SupportedUsersModalProps {
   open: boolean;
@@ -16,28 +17,23 @@ const SupportedUsersModal: React.FC<SupportedUsersModalProps> = ({ open, support
 
   if (!open) return null;
 
-  const handleAdd = async () => {
-    setStatus(null);
-    if (!email) {
-      setStatus('Please enter an email.');
-      return;
+  const handleAddSupportedUser = async (email: string) => {
+    // Fetch parent user by email to get parent_id
+    const parentRes = await fetch(`/api/user/email?email=${encodeURIComponent(email)}`);
+    const parentData = await parentRes.json();
+    if (!parentRes.ok || !parentData.user || !parentData.user.id) {
+      throw new Error(parentData.error ? parentData.error : 'Parent not found.');
     }
-    try {
-      const res = await fetch('/api/relationship/add', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ helper_id: helperId || helperName, parent_email: email }),
-      });
-      const result = await res.json();
-      if (result.success) {
-        setStatus('✅ Supported user added successfully!');
-        setEmail('');
-        setShowAddModal(false);
-      } else {
-        setStatus(result.error ? `❌ ${result.error}` : '❌ Failed to add supported user.');
-      }
-    } catch {
-      setStatus('❌ Network or server error while adding supported user.');
+    const parent_id = parentData.user.id;
+    // Send relationship add request with parent_id and helper_id
+    const res = await fetch('/api/relationship/add', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ parent_id, helper_id: helperId }),
+    });
+    const result = await res.json();
+    if (!result.success) {
+      throw new Error(result.error ? result.error : 'Failed to add supported user.');
     }
   };
 
@@ -66,27 +62,11 @@ const SupportedUsersModal: React.FC<SupportedUsersModalProps> = ({ open, support
           Close
         </button>
         {/* Add Supported User Modal */}
-        {showAddModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-40 z-60 flex items-center justify-center">
-            <div className="bg-white rounded-lg shadow-lg p-6 w-80">
-              <h3 className="text-lg font-semibold mb-4 text-gray-900">Add Supported User</h3>
-              <input
-                type="email"
-                className="w-full border rounded px-3 py-2 mb-2"
-                placeholder="Parent's email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-              />
-              {status && <div className="mb-2 text-sm text-red-600">{status}</div>}
-              <button className="w-full py-2 px-3 bg-blue-500 text-white rounded mb-2" onClick={handleAdd}>
-                Add
-              </button>
-              <button className="w-full py-2 px-3 bg-gray-200 rounded" onClick={() => { setShowAddModal(false); setStatus(null); }}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
+        <AddSupportedUserModal
+          open={showAddModal}
+          onAdd={handleAddSupportedUser}
+          onClose={() => setShowAddModal(false)}
+        />
       </div>
     </div>
   );

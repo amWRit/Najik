@@ -3,7 +3,7 @@ import { Settings } from 'lucide-react';
 import IconButton from '../Button/IconButton';
 import SupportersModal from '@/components/SupportersModal/SupportersModal';
 import SupportedUsersModal from '@/components/SupportedUsersModal/SupportedUsersModal';
-import AddSupporterModal from '@/components/AddSupporterModal/AddSupporterModal';
+import AddSupporterModal from '@/components/SupportersModal/AddSupporterModal';
 
 interface NavbarProps {
   title?: string;

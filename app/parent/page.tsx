@@ -16,7 +16,6 @@ import styles from './parent.module.css';
 import { prisma } from '@/lib/prisma/client';
 import Navbar from '@/components/Navbar/Navbar';
 import SupportersModal from '@/components/SupportersModal/SupportersModal';
-import AddSupporterModal from '@/components/AddSupporterModal/AddSupporterModal';
 
 export default function ParentPage() {
   // ...existing code...
