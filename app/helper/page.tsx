@@ -19,6 +19,7 @@ import Navbar from '@/components/Navbar/Navbar';
 import styles from './helper.module.css';
 import dynamic from 'next/dynamic';
 import SupportedUsersModal from '@/components/SupportedUsersModal/SupportedUsersModal';
+import GenericSelector from '@/components/GeneralSelector/GeneralSelector';
 
 // Dynamically import Map component (client-side only)
 const Map = dynamic(() => import('@/components/Map/Map'), { ssr: false });
@@ -327,6 +328,20 @@ export default function HelperPage() {
     return `${Math.floor(seconds / 3600)} hours ago`;
   };
 
+    // State for custom select menu
+  const [showParentMenu, setShowParentMenu] = useState(false);
+  // Close menu on outside click
+  useEffect(() => {
+    if (!showParentMenu) return;
+    const handle = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement).closest('.' + styles.customSelect)) {
+        setShowParentMenu(false);
+      }
+    };
+    window.addEventListener('mousedown', handle);
+    return () => window.removeEventListener('mousedown', handle);
+  }, [showParentMenu]);
+
   if (authLoading) {
     return <Loading size="large" text="Loading dashboard..." />;
   }
@@ -403,54 +418,34 @@ export default function HelperPage() {
           }}
         />
         <div className={styles.layout}>
-        {/* Sidebar - Parents List */}
-        <aside className={styles.sidebar}>
-          <h2 className={styles.sidebarTitle}>Your Parents</h2>
-          {parentLoading ? (
-            <Loading size="large" text="Loading parents..." />
-          ) : parentUsers.length === 0 ? (
-            <Card>
-              <p className={styles.emptyMessage}>
-                No parents connected yet. Ask them to add you as a helper.
-              </p>
-            </Card>
-          ) : (
-            <div className={styles.parentsList}>
-              {parentUsers.map((parent) => {
-                const isSelected = selectedParent && selectedParent.id === parent.id;
+          {/* Modern Parent Selector */}
+          <div className={styles.parentSelectWrapper}>
+            <div className={styles.selectContainer}>
+              {(() => {
+                const parentOptions = parentUsers.map(parent => ({
+                  id: parent.id,
+                  label: parent.name,
+                  sublabel: parent.email,
+                  badge: parentSharing[parent.id] ? 'Sharing' : undefined,
+                }));
                 return (
-                  <Card
-                    key={parent.id}
-                    className={
-                      styles.parentCard +
-                      (isSelected ? ' ' + styles.selectedParentCard : '') +
-                      ' cursor-pointer'
-                    }
-                    onClick={() => {
-                      console.log('Parent card clicked:', parent);
-                      setSelectedParent({ id: parent.id, name: parent.name, email: parent.email } as User);
+                  <GenericSelector
+                    label="Your Parents"
+                    placeholder="Select a parent..."
+                    options={parentOptions}
+                    value={selectedParent?.id || null}
+                    onChange={option => {
+                      const parent = parentUsers.find(p => p.id === option.id);
+                      if (parent) setSelectedParent({ id: parent.id, name: parent.name, email: parent.email } as User);
                     }}
-                  >
-                    <div className={styles.parentInfo}>
-                      <h3 className={styles.parentName}>{parent.name}</h3>
-                      <span className={styles.parentEmail}>{parent.email}</span>
-                      {parentSharing[parent.id] && (
-                        <span className={styles.sharingLabel}>Sharing Location</span>
-                      )}
-                      <button
-                        style={{marginTop:'0.5rem',padding:'0.25rem 0.5rem',background:'#0070f3',color:'#fff',border:'none',borderRadius:'4px',cursor:'pointer'}}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedParent({ id: parent.id, name: parent.name, email: parent.email } as User);
-                        }}
-                      >Select</button>
-                    </div>
-                  </Card>
+                    loading={parentLoading}
+                    loadingText="Loading parents..."
+                    emptyMessage="No parents connected yet. Ask them to add you as a helper."
+                  />
                 );
-              })}
+              })()}
             </div>
-          )}
-        </aside>
+          </div>
 
         {/* Main Content - Map and Details */}
         <main className={styles.mainContent}>

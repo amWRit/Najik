@@ -1,3 +1,33 @@
+.customSelectMenu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  min-width: 0;
+  background: #fff;
+  border: 2px solid #4A90E2;
+  border-top: none;
+  border-radius: 0 0 0.9rem 0.9rem;
+  box-shadow: 0 8px 32px 0 rgba(74,144,226,0.13);
+  z-index: 10;
+  max-height: 320px;
+  overflow-y: auto;
+  animation: fadeIn 0.18s;
+}
+@media (max-width: 600px) {
+  .customSelectMenu {
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: calc(var(--custom-select-menu-top, 56px));
+    width: 100vw;
+    min-width: 0;
+    border-radius: 0 0 1.2rem 1.2rem;
+    box-shadow: 0 8px 32px 0 rgba(74,144,226,0.13);
+    margin: 0;
+    z-index: 9999;
+  }
+}
 .selectedParentCard {
   border: 2px solid #0070f3;
   box-shadow: 0 0 0 2px #0070f333;
@@ -93,28 +123,113 @@
   gap: 1rem;
 }
 
-.parentCard {
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.parentCard:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-}
-
-.parentInfo {
+.parentSelectWrapper {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.6rem;
+  margin-bottom: 2rem;
+  max-width: 480px;
+  position: relative;
 }
 
-.parentName {
-  font-size: 1.25rem;
+.parentSelectLabel {
+  font-size: 1.05rem;
   font-weight: 700;
-  margin: 0;
-  color: var(--color-text-primary);
+  color: #1e40af;
+  margin-bottom: 0.15rem;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  font-size: 0.875rem;
 }
+
+.selectContainer {
+  position: relative;
+  width: 100%;
+}
+
+.parentSelect {
+  width: 100%;
+  padding: 1rem 3rem 1rem 1.25rem;
+  border-radius: 12px;
+  border: 2px solid #e0e7ff;
+  background: #ffffff;
+  font-size: 1rem;
+  font-weight: 500;
+  color: #1e293b;
+  box-shadow: 
+    0 1px 3px 0 rgba(0, 0, 0, 0.05),
+    0 0 0 0 rgba(59, 130, 246, 0);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  outline: none;
+  appearance: none;
+  cursor: pointer;
+  position: relative;
+  background-image: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+}
+
+.parentSelect:hover {
+  border-color: #c7d2fe;
+  box-shadow: 
+    0 4px 12px 0 rgba(99, 102, 241, 0.08),
+    0 2px 4px 0 rgba(0, 0, 0, 0.04);
+  transform: translateY(-1px);
+}
+
+.parentSelect:focus {
+  border-color: #6366f1;
+  background: #ffffff;
+  box-shadow: 
+    0 0 0 4px rgba(99, 102, 241, 0.12),
+    0 4px 16px 0 rgba(99, 102, 241, 0.15);
+  transform: translateY(-1px);
+}
+
+.parentSelect:active {
+  transform: translateY(0);
+}
+
+.parentSelect option {
+  color: #1e293b;
+  background: #ffffff;
+  font-weight: 500;
+  padding: 0.75rem;
+}
+
+.parentSelect option:checked {
+  background: linear-gradient(90deg, #eef2ff 0%, #e0e7ff 100%);
+  color: #4338ca;
+  font-weight: 600;
+}
+
+.selectIcon {
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: #6366f1;
+  transition: all 0.25s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.parentSelect:focus ~ .selectIcon {
+  color: #4338ca;
+  transform: translateY(-50%) rotate(180deg);
+}
+
+.parentSelect:hover ~ .selectIcon {
+  color: #4338ca;
+}
+
+.emptyMessage {
+  color: #64748b;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  margin: 0;
+}
+
 
 .parentMeta {
   display: flex;

@@ -1,0 +1,334 @@
+.selectorWrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  position: relative;
+  width: 100%;
+}
+
+.label {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #1e40af;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+
+.customSelect {
+  position: relative;
+  width: 100%;
+}
+
+.selectButton {
+  width: 100%;
+  padding: 1rem 3rem 1rem 1.25rem;
+  border-radius: 12px;
+  border: 2px solid #e0e7ff;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  font-size: 1rem;
+  color: #1e293b;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  text-align: left;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+}
+
+.selectButton:hover:not(:disabled) {
+  border-color: #c7d2fe;
+  box-shadow: 0 4px 12px 0 rgba(99, 102, 241, 0.08);
+  transform: translateY(-1px);
+}
+
+.selectButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.selectButtonOpen {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.12);
+  transform: translateY(-1px);
+}
+
+.selectButtonError {
+  border-color: #ef4444;
+}
+
+.selectButtonError:focus {
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.12);
+}
+
+.selectValue {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.placeholder {
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.selectedLabel {
+  font-weight: 600;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.selectedSublabel {
+  color: #64748b;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.625rem;
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  color: #1e40af;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.selectArrow {
+  color: #6366f1;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
+}
+
+.selectArrowOpen {
+  transform: rotate(180deg);
+}
+
+.errorText {
+  color: #ef4444;
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+  display: block;
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.3);
+  z-index: 40;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.dropdown {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  right: 0;
+  z-index: 50;
+  animation: slideDown 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dropdownContent {
+  background: #ffffff;
+  border-radius: 12px;
+  border: 2px solid #e0e7ff;
+  box-shadow: 
+    0 20px 25px -5px rgba(0, 0, 0, 0.1),
+    0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.dropdownItem {
+  width: 100%;
+  padding: 1rem 1.25rem;
+  border: none;
+  background: #ffffff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.dropdownItem:last-child {
+  border-bottom: none;
+}
+
+.dropdownItem:hover:not(:disabled) {
+  background: linear-gradient(90deg, #f0f9ff 0%, #e0f2fe 100%);
+}
+
+.dropdownItem:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dropdownItemSelected {
+  background: linear-gradient(90deg, #dbeafe 0%, #bfdbfe 100%);
+  font-weight: 600;
+}
+
+.dropdownItemSelected:hover {
+  background: linear-gradient(90deg, #bfdbfe 0%, #93c5fd 100%);
+}
+
+.dropdownItemDisabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.optionInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.optionLabel {
+  font-weight: 600;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.optionSublabel {
+  color: #64748b;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.checkIcon {
+  color: #2563eb;
+  flex-shrink: 0;
+}
+
+/* Scrollbar styling */
+.dropdownContent::-webkit-scrollbar {
+  width: 8px;
+}
+
+.dropdownContent::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+.dropdownContent::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.dropdownContent::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Loading and empty states */
+.loadingState {
+  padding: 1rem 1.25rem;
+  border-radius: 12px;
+  border: 2px solid #e0e7ff;
+  background: #f8fafc;
+  color: #64748b;
+  text-align: center;
+  font-size: 0.95rem;
+}
+
+.emptyState {
+  padding: 1.5rem 1.25rem;
+  border-radius: 12px;
+  border: 2px solid #e0e7ff;
+  background: #f8fafc;
+}
+
+.emptyMessage {
+  color: #64748b;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  margin: 0;
+  text-align: center;
+}
+
+/* Mobile responsive - Bottom sheet style with spacing */
+@media (max-width: 640px) {
+  .dropdown {
+    position: fixed;
+    top: auto;
+    bottom: 1rem; /* Add space from bottom */
+    left: 1rem; /* Add space from sides */
+    right: 1rem;
+    animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  @keyframes slideUp {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+  
+  .dropdownContent {
+    border-radius: 20px; /* Rounded on all sides now */
+    max-height: 60vh; /* Reduced from 70vh */
+    border: 2px solid #e0e7ff;
+    box-shadow: 
+      0 20px 25px -5px rgba(0, 0, 0, 0.2),
+      0 10px 10px -5px rgba(0, 0, 0, 0.08);
+  }
+  
+  /* Add a handle for the bottom sheet */
+  .dropdownContent::before {
+    content: '';
+    display: block;
+    width: 40px;
+    height: 4px;
+    background: #cbd5e1;
+    border-radius: 2px;
+    margin: 0.75rem auto 0.5rem;
+  }
+  
+  .dropdownItem {
+    padding: 0.875rem 1rem;
+  }
+  
+  .optionInfo {
+    font-size: 0.9rem;
+  }
+  
+  .optionSublabel {
+    font-size: 0.8rem;
+  }
+}
