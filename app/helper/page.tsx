@@ -68,35 +68,49 @@ export default function HelperPage() {
     const [selectedParent, setSelectedParent] = useState<User | null>(null);
     // New state for latest location update
     const [latestLocation, setLatestLocation] = useState<LocationUpdate | null>(null);
-    // Fetch latest location for selected parent (for fallback and debug)
-    useEffect(() => {
-      if (!selectedParent) {
-        setLatestLocation(null);
-        return;
-      }
-      const fetchLatest = async () => {
-        try {
-          const res = await fetch(`/api/location-update/latest?user_id=${selectedParent.id}`);
-          if (res.ok) {
-            const data = await res.json();
-            console.log('DEBUG: /api/location-update/latest response for selectedParent:', data);
-            setLatestLocation(data.locationUpdate || null);
-          } else {
-            console.warn('Failed to fetch latest locationUpdate for selectedParent', selectedParent.id, res.status);
-            setLatestLocation(null);
-          }
-        } catch (err) {
-          console.error('Error fetching latest locationUpdate for selectedParent', selectedParent.id, err);
-          setLatestLocation(null);
-        }
-      };
-      fetchLatest();
-    }, [selectedParent]);
-  
     // Manual selection only: do not auto-select parent
     // Track sharing status for each parent
     const [parentSharing, setParentSharing] = useState<Record<string, boolean>>({});
     // (Test click handler removed)
+    // Poll for latest location if parent is selected and sharing
+    useEffect(() => {
+      let polling = true;
+      let pollTimeout: NodeJS.Timeout | null = null;
+      async function pollLocation() {
+        if (!selectedParent || !parentSharing[selectedParent.id]) {
+          setLatestLocation(null);
+          return;
+        }
+        try {
+          const res = await fetch(`/api/location-update/latest?user_id=${selectedParent.id}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.locationUpdate) {
+              setLatestLocation(data.locationUpdate);
+            } else {
+              // Location deleted (sharing stopped)
+              setLatestLocation(null);
+            }
+          } else {
+            setLatestLocation(null);
+          }
+        } catch {
+          setLatestLocation(null);
+        }
+        if (polling && selectedParent && parentSharing[selectedParent.id]) {
+          pollTimeout = setTimeout(pollLocation, 3000);
+        }
+      }
+      if (selectedParent && parentSharing[selectedParent.id]) {
+        pollLocation();
+      } else {
+        setLatestLocation(null);
+      }
+      return () => {
+        polling = false;
+        if (pollTimeout) clearTimeout(pollTimeout);
+      };
+    }, [selectedParent, parentSharing]);
     // Selected parent info for display
     const [selectedParentInfo, setSelectedParentInfo] = useState<ParentStatus | null>(null);
     // SOS polling for all parents
