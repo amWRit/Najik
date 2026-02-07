@@ -30,7 +30,12 @@ export default function HomePage() {
     }
   }, [session, status, router]);
 
-  if (status === "loading") {
+  // Show spinner for loading or authenticated users (until redirect completes)
+  if (
+    status === "loading" ||
+    session?.user?.role === "parent" ||
+    session?.user?.role === "helper"
+  ) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-gray-900">
         <div className="text-center">
@@ -41,6 +46,7 @@ export default function HomePage() {
     );
   }
 
+  // Only show home page content for unauthenticated users
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-gray-900">
       <div className="text-center space-y-8 max-w-2xl">
