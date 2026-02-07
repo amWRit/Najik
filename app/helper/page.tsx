@@ -73,35 +73,45 @@ export default function HelperPage() {
     const [parentSharing, setParentSharing] = useState<Record<string, boolean>>({});
     // (Test click handler removed)
     // Poll for latest location if parent is selected and sharing
+    const selectedParentRef = useRef<User | null>(null);
+    const parentSharingRef = useRef<Record<string, boolean>>({});
     useEffect(() => {
-      let polling = true;
+      selectedParentRef.current = selectedParent;
+    }, [selectedParent]);
+    useEffect(() => {
+      parentSharingRef.current = parentSharing;
+    }, [parentSharing]);
+
+    useEffect(() => {
+      let cancelled = false;
       let pollTimeout: NodeJS.Timeout | null = null;
       async function pollLocation() {
-        if (!selectedParent || !parentSharing[selectedParent.id]) {
+        const currentParent = selectedParentRef.current;
+        const currentSharing = parentSharingRef.current;
+        if (!currentParent || !currentSharing[currentParent.id]) {
           setLatestLocation(null);
           return;
         }
         try {
-          const res = await fetch(`/api/location-update/latest?user_id=${selectedParent.id}`);
+          const res = await fetch(`/api/location-update/latest?user_id=${currentParent.id}`);
           if (res.ok) {
             const data = await res.json();
             if (data.locationUpdate) {
               setLatestLocation(data.locationUpdate);
-              setParentSharing(prev => ({ ...prev, [selectedParent.id]: !!data.locationUpdate.is_sharing }));
+              setParentSharing(prev => ({ ...prev, [currentParent.id]: !!data.locationUpdate.is_sharing }));
             } else {
-              // Location deleted (sharing stopped)
               setLatestLocation(null);
-              setParentSharing(prev => ({ ...prev, [selectedParent.id]: false }));
+              setParentSharing(prev => ({ ...prev, [currentParent.id]: false }));
             }
           } else {
             setLatestLocation(null);
-            setParentSharing(prev => ({ ...prev, [selectedParent.id]: false }));
+            setParentSharing(prev => ({ ...prev, [currentParent.id]: false }));
           }
         } catch {
           setLatestLocation(null);
-          setParentSharing(prev => ({ ...prev, [selectedParent.id]: false }));
+          setParentSharing(prev => ({ ...prev, [currentParent.id]: false }));
         }
-        if (polling && selectedParent && parentSharing[selectedParent.id]) {
+        if (!cancelled && currentParent && currentSharing[currentParent.id]) {
           pollTimeout = setTimeout(pollLocation, 3000);
         }
       }
@@ -111,7 +121,7 @@ export default function HelperPage() {
         setLatestLocation(null);
       }
       return () => {
-        polling = false;
+        cancelled = true;
         if (pollTimeout) clearTimeout(pollTimeout);
       };
     }, [selectedParent, parentSharing]);
@@ -211,35 +221,32 @@ export default function HelperPage() {
 
   // Fetch latest location update for each parent to determine sharing status
   useEffect(() => {
-    if (!parentUsers.length) {
+    if (!parentUsers.length || !selectedParent) {
       setParentSharing({});
       return;
     }
-    if (!selectedParent) {
-      setParentSharing({});
-      return;
-    }
+    let cancelled = false;
     const fetchSharing = async () => {
-      const sharing: Record<string, boolean> = {};
-      await Promise.all(parentUsers.map(async (parent) => {
-        try {
-          const res = await fetch(`/api/location-update/latest?user_id=${parent.id}`);
-          if (res.ok) {
-            const data = await res.json();
-            sharing[parent.id] = !!(data?.locationUpdate?.is_sharing);
-          } else {
-            sharing[parent.id] = false;
-          }
-        } catch (err) {
-          sharing[parent.id] = false;
+      try {
+        const res = await fetch(`/api/location-update/latest?user_id=${selectedParent.id}`);
+        let sharing: Record<string, boolean> = {};
+        if (res.ok) {
+          const data = await res.json();
+          sharing[selectedParent.id] = !!(data?.locationUpdate?.is_sharing);
+        } else {
+          sharing[selectedParent.id] = false;
         }
-      }));
-      setParentSharing(sharing);
+        if (!cancelled) setParentSharing(sharing);
+      } catch (err) {
+        if (!cancelled) setParentSharing({ [selectedParent.id]: false });
+      }
     };
     fetchSharing();
-    // Poll every 5 seconds to update sharing status while selected
     const interval = setInterval(fetchSharing, 5000);
-    return () => clearInterval(interval);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, [parentUsers, selectedParent]);
 
   // Fetch selected parent's location and status when selected
@@ -450,7 +457,10 @@ export default function HelperPage() {
                     id: parent.id,
                     label: parent.name,
                     sublabel: parent.email,
-                    badge: parentSharing[parent.id] ? 'Sharing' : undefined,
+                    badge:
+                      selectedParent && selectedParent.id === parent.id && parentSharing[parent.id]
+                        ? 'Sharing'
+                        : undefined,
                   }))
                 ];
                 return (
@@ -508,7 +518,7 @@ export default function HelperPage() {
           {selectedParentInfo ? (
             <>
               {/* Map */}
-              {selectedParentInfo.lastLocation ? (
+              {selectedParentInfo.isSharing && selectedParentInfo.lastLocation ? (
                 <div className={styles.mapContainer}>
                   <Map
                     center={[
