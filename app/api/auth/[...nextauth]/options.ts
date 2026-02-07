@@ -27,6 +27,17 @@ export const authOptions = {
   session: {
     strategy: "jwt" as const,
   },
+  cookies: {
+    sessionToken: {
+      name: `__Secure-next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: "none" as const,
+        path: "/",
+        secure: true,
+      },
+    },
+  },
   callbacks: {
     async session({ session, token, user }: { session: any; token: any; user: any }) {
       if (session.user) {
