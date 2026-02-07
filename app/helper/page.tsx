@@ -229,7 +229,7 @@ export default function HelperPage() {
     const fetchSharing = async () => {
       try {
         const res = await fetch(`/api/location-update/latest?user_id=${selectedParent.id}`);
-        let sharing: Record<string, boolean> = {};
+        const sharing: Record<string, boolean> = {};
         if (res.ok) {
           const data = await res.json();
           sharing[selectedParent.id] = !!(data?.locationUpdate?.is_sharing);
