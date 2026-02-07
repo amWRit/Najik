@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   try {
     const locationUpdate = await prisma.location_updates.findFirst({
       where: { user_id },
-      orderBy: { timestamp: "desc" },
+      orderBy: { timestamp: 'desc' },
     });
     return NextResponse.json({ locationUpdate });
   } catch (err) {

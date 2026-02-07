@@ -87,15 +87,19 @@ export default function HelperPage() {
             const data = await res.json();
             if (data.locationUpdate) {
               setLatestLocation(data.locationUpdate);
+              setParentSharing(prev => ({ ...prev, [selectedParent.id]: !!data.locationUpdate.is_sharing }));
             } else {
               // Location deleted (sharing stopped)
               setLatestLocation(null);
+              setParentSharing(prev => ({ ...prev, [selectedParent.id]: false }));
             }
           } else {
             setLatestLocation(null);
+            setParentSharing(prev => ({ ...prev, [selectedParent.id]: false }));
           }
         } catch {
           setLatestLocation(null);
+          setParentSharing(prev => ({ ...prev, [selectedParent.id]: false }));
         }
         if (polling && selectedParent && parentSharing[selectedParent.id]) {
           pollTimeout = setTimeout(pollLocation, 3000);
@@ -211,6 +215,10 @@ export default function HelperPage() {
       setParentSharing({});
       return;
     }
+    if (!selectedParent) {
+      setParentSharing({});
+      return;
+    }
     const fetchSharing = async () => {
       const sharing: Record<string, boolean> = {};
       await Promise.all(parentUsers.map(async (parent) => {
@@ -218,21 +226,21 @@ export default function HelperPage() {
           const res = await fetch(`/api/location-update/latest?user_id=${parent.id}`);
           if (res.ok) {
             const data = await res.json();
-            console.log('Fetched locationUpdate for parent', parent.id, parent.name, data.locationUpdate);
             sharing[parent.id] = !!(data?.locationUpdate?.is_sharing);
           } else {
-            console.warn('Failed to fetch locationUpdate for parent', parent.id, parent.name, res.status);
             sharing[parent.id] = false;
           }
         } catch (err) {
-          console.error('Error fetching locationUpdate for parent', parent.id, parent.name, err);
           sharing[parent.id] = false;
         }
       }));
       setParentSharing(sharing);
     };
     fetchSharing();
-  }, [parentUsers]);
+    // Poll every 5 seconds to update sharing status while selected
+    const interval = setInterval(fetchSharing, 5000);
+    return () => clearInterval(interval);
+  }, [parentUsers, selectedParent]);
 
   // Fetch selected parent's location and status when selected
   useEffect(() => {
@@ -436,12 +444,15 @@ export default function HelperPage() {
           <div className={styles.parentSelectWrapper}>
             <div className={styles.selectContainer}>
               {(() => {
-                const parentOptions = parentUsers.map(parent => ({
-                  id: parent.id,
-                  label: parent.name,
-                  sublabel: parent.email,
-                  badge: parentSharing[parent.id] ? 'Sharing' : undefined,
-                }));
+                const parentOptions = [
+                  { id: '', label: 'Deselect', sublabel: 'Stop monitoring location' },
+                  ...parentUsers.map(parent => ({
+                    id: parent.id,
+                    label: parent.name,
+                    sublabel: parent.email,
+                    badge: parentSharing[parent.id] ? 'Sharing' : undefined,
+                  }))
+                ];
                 return (
                   <GenericSelector
                     label="Your Parents"
@@ -449,8 +460,12 @@ export default function HelperPage() {
                     options={parentOptions}
                     value={selectedParent?.id || null}
                     onChange={option => {
-                      const parent = parentUsers.find(p => p.id === option.id);
-                      if (parent) setSelectedParent({ id: parent.id, name: parent.name, email: parent.email } as User);
+                      if (option.id === '') {
+                        setSelectedParent(null);
+                      } else {
+                        const parent = parentUsers.find(p => p.id === option.id);
+                        if (parent) setSelectedParent({ id: parent.id, name: parent.name, email: parent.email } as User);
+                      }
                     }}
                     loading={parentLoading}
                     loadingText="Loading parents..."
