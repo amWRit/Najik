@@ -385,11 +385,12 @@ export default function HelperPage() {
         {showCancelToast && (
           <Toast message={toastMsg} onClose={() => setShowCancelToast(false)} />
         )}
-        <Modal isOpen={showWelcome} onClose={() => setShowWelcome(false)} title="Welcome to Najik Helper Dashboard!">
+        <Modal isOpen={showWelcome} onClose={() => setShowWelcome(false)} title="Helper Dashboard!">
           <div className="flex flex-col items-center justify-center gap-4">
-            <p className="text-base text-gray-700">This dashboard helps you monitor and assist your connected parents in real time.</p>
-            <Button size="large" variant="primary" onClick={() => setShowWelcome(false)}>
-              OK
+            <p className="text-base text-gray-700">This dashboard helps you monitor and assist your connected supported users in real time.</p>
+            <Button size="medium" variant="primary" onClick={() => setShowWelcome(false)} className="px-6 py-2 rounded-full flex items-center gap-2 shadow-md">
+              <span>Get Started</span>
+              <span aria-hidden="true">🚀</span>
             </Button>
           </div>
         </Modal>
@@ -465,8 +466,8 @@ export default function HelperPage() {
                 ];
                 return (
                   <GenericSelector
-                    label="Your Parents"
-                    placeholder="Select a parent..."
+                    label="Your Supported Users"
+                    placeholder="Select a supported user..."
                     options={parentOptions}
                     value={selectedParent?.id || null}
                     onChange={option => {
@@ -575,9 +576,9 @@ export default function HelperPage() {
           ) : (
             <Card>
               <div className={styles.noSelection}>
-                <span className={styles.noSelectionIcon}>👈</span>
-                <h3>Select a Parent</h3>
-                <p>Choose a parent from the list to view their location</p>
+                <span className={styles.noSelectionIcon}>🧑‍🤝‍🧑</span>
+                <h3>Select a Supported User</h3>
+                <p>Choose a supported user from the list to view their location</p>
               </div>
             </Card>
           )}
