@@ -1,18 +1,25 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParentSOSPolling } from '@/hooks/useParentSOSPolling';
+// import { useParentSOSPolling } from '@/hooks/useParentSOSPolling';
+import { useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useRealtimeSubscription } from '@/hooks/useRealtime';
 import { LocationUpdate, SOSAlert, User } from '@/lib/types/database.types';
+
 import Button from '@/components/Button/Button';
 import Card from '@/components/Card/Card';
 import StatusIndicator from '@/components/StatusIndicator/StatusIndicator';
 import BatteryIndicator from '@/components/BatteryIndicator/BatteryIndicator';
 import Loading from '@/components/Loading/Loading';
-import dynamic from 'next/dynamic';
+import Modal from '@/components/Modal/Modal';
+import Toast from '@/components/Toast/Toast';
+import Navbar from '@/components/Navbar/Navbar';
 import styles from './helper.module.css';
+import dynamic from 'next/dynamic';
+import SupportedUsersModal from '@/components/SupportedUsersModal/SupportedUsersModal';
+import GenericSelector from '@/components/GeneralSelector/GeneralSelector';
 
 // Dynamically import Map component (client-side only)
 const Map = dynamic(() => import('@/components/Map/Map'), { ssr: false });
@@ -25,52 +32,160 @@ interface ParentStatus {
 }
 
 export default function HelperPage() {
+    // Toast for cancel/acknowledge
+    const [showCancelToast, setShowCancelToast] = useState(false);
+    const [toastMsg, setToastMsg] = useState('');
+    // Welcome modal state
+    const [showWelcome, setShowWelcome] = useState(true);
+    // Settings modal state
+    const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+    // Supported users modal state
+    const [showSupportedUsersModal, setShowSupportedUsersModal] = useState(false);
+    // Unlock audio context on first user interaction
+    useEffect(() => {
+      let ctx: AudioContext | null = null;
+      const unlockAudio = () => {
+        try {
+          ctx = window.AudioContext ? new window.AudioContext() : (window as any).webkitAudioContext && new (window as any).webkitAudioContext();
+          if (ctx && ctx.state === 'suspended') {
+            ctx.resume();
+          }
+        } catch {}
+        window.removeEventListener('pointerdown', unlockAudio);
+        window.removeEventListener('keydown', unlockAudio);
+      };
+      window.addEventListener('pointerdown', unlockAudio);
+      window.addEventListener('keydown', unlockAudio);
+      return () => {
+        window.removeEventListener('pointerdown', unlockAudio);
+        window.removeEventListener('keydown', unlockAudio);
+        if (ctx) ctx.close();
+      };
+    }, []);
     const [parentUsers, setParentUsers] = useState<{id: string, name: string, email: string}[]>([]);
+    // For SupportedUsersModal
+    const supportedUsers = parentUsers.map(p => ({ name: p.name, email: p.email }));
     const [selectedParent, setSelectedParent] = useState<User | null>(null);
     // New state for latest location update
     const [latestLocation, setLatestLocation] = useState<LocationUpdate | null>(null);
-    // Fetch latest location for selected parent (for fallback and debug)
-    useEffect(() => {
-      if (!selectedParent) {
-        setLatestLocation(null);
-        return;
-      }
-      const fetchLatest = async () => {
-        try {
-          const res = await fetch(`/api/location-update/latest?user_id=${selectedParent.id}`);
-          if (res.ok) {
-            const data = await res.json();
-            console.log('DEBUG: /api/location-update/latest response for selectedParent:', data);
-            setLatestLocation(data.locationUpdate || null);
-          } else {
-            console.warn('Failed to fetch latest locationUpdate for selectedParent', selectedParent.id, res.status);
-            setLatestLocation(null);
-          }
-        } catch (err) {
-          console.error('Error fetching latest locationUpdate for selectedParent', selectedParent.id, err);
-          setLatestLocation(null);
-        }
-      };
-      fetchLatest();
-    }, [selectedParent]);
-  
-    // Auto-select first parent when parentUsers is loaded
-    useEffect(() => {
-      if (parentUsers.length > 0 && !selectedParent) {
-        setSelectedParent({
-          id: parentUsers[0].id,
-          name: parentUsers[0].name,
-          email: parentUsers[0].email,
-        } as User);
-      }
-    }, [parentUsers, selectedParent]);
+    // Manual selection only: do not auto-select parent
     // Track sharing status for each parent
     const [parentSharing, setParentSharing] = useState<Record<string, boolean>>({});
-  // (Test click handler removed)
-  // Selected parent info for display
-  const [selectedParentInfo, setSelectedParentInfo] = useState<ParentStatus | null>(null);
-  // SOS polling for selected parent
-  const { sosActive: parentSOSActive } = useParentSOSPolling(selectedParent?.id || '');
+    // (Test click handler removed)
+    // Poll for latest location if parent is selected and sharing
+    const selectedParentRef = useRef<User | null>(null);
+    const parentSharingRef = useRef<Record<string, boolean>>({});
+    useEffect(() => {
+      selectedParentRef.current = selectedParent;
+    }, [selectedParent]);
+    useEffect(() => {
+      parentSharingRef.current = parentSharing;
+    }, [parentSharing]);
+
+    useEffect(() => {
+      let cancelled = false;
+      let pollTimeout: NodeJS.Timeout | null = null;
+      async function pollLocation() {
+        const currentParent = selectedParentRef.current;
+        const currentSharing = parentSharingRef.current;
+        if (!currentParent || !currentSharing[currentParent.id]) {
+          setLatestLocation(null);
+          return;
+        }
+        try {
+          const res = await fetch(`/api/location-update/latest?user_id=${currentParent.id}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.locationUpdate) {
+              setLatestLocation(data.locationUpdate);
+              setParentSharing(prev => ({ ...prev, [currentParent.id]: !!data.locationUpdate.is_sharing }));
+            } else {
+              setLatestLocation(null);
+              setParentSharing(prev => ({ ...prev, [currentParent.id]: false }));
+            }
+          } else {
+            setLatestLocation(null);
+            setParentSharing(prev => ({ ...prev, [currentParent.id]: false }));
+          }
+        } catch {
+          setLatestLocation(null);
+          setParentSharing(prev => ({ ...prev, [currentParent.id]: false }));
+        }
+        if (!cancelled && currentParent && currentSharing[currentParent.id]) {
+          pollTimeout = setTimeout(pollLocation, 3000);
+        }
+      }
+      if (selectedParent && parentSharing[selectedParent.id]) {
+        pollLocation();
+      } else {
+        setLatestLocation(null);
+      }
+      return () => {
+        cancelled = true;
+        if (pollTimeout) clearTimeout(pollTimeout);
+      };
+    }, [selectedParent, parentSharing]);
+    // Selected parent info for display
+    const [selectedParentInfo, setSelectedParentInfo] = useState<ParentStatus | null>(null);
+    // SOS polling for all parents
+    const [sosAlertsState, setSosAlertsState] = useState<Record<string, SOSAlert | null>>({});
+    const audioRef = useRef<HTMLAudioElement | null>(null);
+    // Track acknowledging state for each SOS alert
+    const [acknowledging, setAcknowledging] = useState<Record<string, boolean>>({});
+
+    useEffect(() => {
+      if (!parentUsers.length) return;
+      let polling = true;
+      const pollSOS = async () => {
+        const newSosAlerts: Record<string, SOSAlert | null> = {};
+        let anyActiveSOS = false;
+        for (const parent of parentUsers) {
+          try {
+            const res = await fetch(`/api/sos/latest?userId=${parent.id}`);
+            if (res.ok) {
+              const data = await res.json();
+              if (data && data.is_active) {
+                newSosAlerts[parent.id] = data;
+                anyActiveSOS = true;
+              } else {
+                newSosAlerts[parent.id] = null;
+              }
+            } else {
+              newSosAlerts[parent.id] = null;
+            }
+          } catch {
+            newSosAlerts[parent.id] = null;
+          }
+        }
+        setSosAlertsState(newSosAlerts);
+        // Play sound if any SOS active
+        if (anyActiveSOS) {
+          if (!audioRef.current) {
+            const audio = new Audio('/sounds/sos-alarm.mp3');
+            audio.loop = true;
+            audio.volume = 1.0;
+            audio.play().catch(() => {});
+            audioRef.current = audio;
+          }
+        } else {
+          if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = 0;
+            audioRef.current = null;
+          }
+        }
+        if (polling) setTimeout(pollSOS, 3000);
+      };
+      pollSOS();
+      return () => {
+        polling = false;
+        if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current.currentTime = 0;
+          audioRef.current = null;
+        }
+      };
+    }, [parentUsers]);
   const router = useRouter();
   const { user, loading: authLoading, signOut } = useAuth();
   const [parents, setParents] = useState<ParentStatus[]>([]);
@@ -106,32 +221,33 @@ export default function HelperPage() {
 
   // Fetch latest location update for each parent to determine sharing status
   useEffect(() => {
-    if (!parentUsers.length) {
+    if (!parentUsers.length || !selectedParent) {
       setParentSharing({});
       return;
     }
+    let cancelled = false;
     const fetchSharing = async () => {
-      const sharing: Record<string, boolean> = {};
-      await Promise.all(parentUsers.map(async (parent) => {
-        try {
-          const res = await fetch(`/api/location-update/latest?user_id=${parent.id}`);
-          if (res.ok) {
-            const data = await res.json();
-            console.log('Fetched locationUpdate for parent', parent.id, parent.name, data.locationUpdate);
-            sharing[parent.id] = !!(data?.locationUpdate?.is_sharing);
-          } else {
-            console.warn('Failed to fetch locationUpdate for parent', parent.id, parent.name, res.status);
-            sharing[parent.id] = false;
-          }
-        } catch (err) {
-          console.error('Error fetching locationUpdate for parent', parent.id, parent.name, err);
-          sharing[parent.id] = false;
+      try {
+        const res = await fetch(`/api/location-update/latest?user_id=${selectedParent.id}`);
+        const sharing: Record<string, boolean> = {};
+        if (res.ok) {
+          const data = await res.json();
+          sharing[selectedParent.id] = !!(data?.locationUpdate?.is_sharing);
+        } else {
+          sharing[selectedParent.id] = false;
         }
-      }));
-      setParentSharing(sharing);
+        if (!cancelled) setParentSharing(sharing);
+      } catch (err) {
+        if (!cancelled) setParentSharing({ [selectedParent.id]: false });
+      }
     };
     fetchSharing();
-  }, [parentUsers]);
+    const interval = setInterval(fetchSharing, 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [parentUsers, selectedParent]);
 
   // Fetch selected parent's location and status when selected
   useEffect(() => {
@@ -152,21 +268,10 @@ export default function HelperPage() {
     setSelectedParentInfo({
       user: selectedParent,
       lastLocation,
-      sosAlert: parentSOSActive
-        ? {
-            id: 'active',
-            user_id: selectedParent.id,
-            latitude: 0,
-            longitude: 0,
-            timestamp: new Date().toISOString(),
-            acknowledged_at: null,
-            acknowledged_by: null,
-            is_active: true,
-          }
-        : null,
+      sosAlert: sosAlertsState[selectedParent.id] || null,
       isSharing: !!parentSharing[selectedParent.id],
     });
-  }, [selectedParent, locationUpdates, parentSharing, latestLocation, parentSOSActive]);
+  }, [selectedParent, locationUpdates, parentSharing, latestLocation, sosAlertsState]);
 
   
   // Fetch parents and their status
@@ -199,14 +304,50 @@ export default function HelperPage() {
 
   const handleAcknowledgeSOS = async (alertId: string) => {
     if (!user) return;
-    // TODO: Replace Supabase update with Prisma or other backend mutation
-    setParents(prev =>
-      prev.map(p =>
-        p.sosAlert?.id === alertId
-          ? { ...p, sosAlert: null }
-          : p
-      )
-    );
+    setAcknowledging((prev) => ({ ...prev, [alertId]: true }));
+    try {
+      const res = await fetch(`/api/sos/${alertId}/update`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          is_active: false,
+          acknowledged_by: user.id,
+          acknowledged_at: new Date().toISOString(),
+        }),
+      });
+      const result = await res.json();
+      // Stop alarm audio immediately
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+        audioRef.current = null;
+      }
+      if (res.ok && result.success) {
+        setToastMsg('SOS acknowledged and alarm cancelled');
+        setShowCancelToast(true);
+        setParents(prev =>
+          prev.map(p =>
+            p.sosAlert?.id === alertId
+              ? { ...p, sosAlert: null }
+              : p
+          )
+        );
+      } else {
+        setToastMsg(result.error || 'Failed to acknowledge SOS');
+        setShowCancelToast(true);
+      }
+    } catch (err) {
+      // Stop alarm audio on error as well
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+        audioRef.current = null;
+      }
+      setToastMsg('Network error while acknowledging SOS');
+      setShowCancelToast(true);
+    } finally {
+      setAcknowledging((prev) => ({ ...prev, [alertId]: false }));
+    }
   };
 
   const getTimeSince = (timestamp: string) => {
@@ -216,6 +357,20 @@ export default function HelperPage() {
     return `${Math.floor(seconds / 3600)} hours ago`;
   };
 
+    // State for custom select menu
+  const [showParentMenu, setShowParentMenu] = useState(false);
+  // Close menu on outside click
+  useEffect(() => {
+    if (!showParentMenu) return;
+    const handle = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement).closest('.' + styles.customSelect)) {
+        setShowParentMenu(false);
+      }
+    };
+    window.addEventListener('mousedown', handle);
+    return () => window.removeEventListener('mousedown', handle);
+  }, [showParentMenu]);
+
   if (authLoading) {
     return <Loading size="large" text="Loading dashboard..." />;
   }
@@ -224,99 +379,147 @@ export default function HelperPage() {
     return null;
   }
 
-  return (
-    <div className={styles.container}>
-      {/* Main header only, temp duplicate removed */}
-      <header className={styles.header}>
-        <div className={styles.headerTop}>
-          <h1 className={styles.title}>Helper Dashboard</h1>
-          <button onClick={signOut} className={styles.signOutButton}>
-            Sign Out
-          </button>
-        </div>
-        <p className={styles.subtitle}>Welcome, {user.name}!</p>
-      </header>
-
-      <div className={styles.layout}>
-        {/* Sidebar - Parents List */}
-        <aside className={styles.sidebar}>
-          <h2 className={styles.sidebarTitle}>Your Parents</h2>
-          {parentLoading ? (
-            <Loading size="large" text="Loading parents..." />
-          ) : parentUsers.length === 0 ? (
-            <Card>
-              <p className={styles.emptyMessage}>
-                No parents connected yet. Ask them to add you as a helper.
-              </p>
-            </Card>
-          ) : (
-            <div className={styles.parentsList}>
-              {parentUsers.map((parent) => {
-                const isSelected = selectedParent && selectedParent.id === parent.id;
-                return (
-                  <Card
-                    key={parent.id}
-                    className={
-                      styles.parentCard +
-                      (isSelected ? ' ' + styles.selectedParentCard : '') +
-                      ' cursor-pointer'
-                    }
-                    onClick={() => {
-                      console.log('Parent card clicked:', parent);
-                      setSelectedParent({ id: parent.id, name: parent.name, email: parent.email } as User);
-                    }}
-                  >
-                    <div className={styles.parentInfo}>
-                      <h3 className={styles.parentName}>{parent.name}</h3>
-                      <span className={styles.parentEmail}>{parent.email}</span>
-                      {parentSharing[parent.id] && (
-                        <span className={styles.sharingLabel}>Sharing Location</span>
-                      )}
-                      <button
-                        style={{marginTop:'0.5rem',padding:'0.25rem 0.5rem',background:'#0070f3',color:'#fff',border:'none',borderRadius:'4px',cursor:'pointer'}}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedParent({ id: parent.id, name: parent.name, email: parent.email } as User);
-                        }}
-                      >Select</button>
-                    </div>
-                  </Card>
-                );
-              })}
+    return (
+      <div className={styles.container}>
+        {/* Toast for SOS cancel/acknowledge */}
+        {showCancelToast && (
+          <Toast message={toastMsg} onClose={() => setShowCancelToast(false)} />
+        )}
+        <Modal isOpen={showWelcome} onClose={() => setShowWelcome(false)} title="Helper Dashboard!">
+          <div className="flex flex-col items-center justify-center gap-4">
+            <p className="text-base text-gray-700">This dashboard helps you monitor and assist your connected supported users in real time.</p>
+            <Button size="medium" variant="primary" onClick={() => setShowWelcome(false)} className="px-6 py-2 rounded-full flex items-center gap-2 shadow-md">
+              <span>Get Started</span>
+              <span aria-hidden="true">🚀</span>
+            </Button>
+          </div>
+        </Modal>
+        {/* Navbar with settings menu */}
+        <Navbar
+          title="Najik Helper"
+          userRole="helper"
+          userName={user.name ?? undefined}
+          onSignOut={signOut}
+          onSettingsClick={() => setShowSettingsMenu(true)}
+        />
+        {/* Settings Menu Modal */}
+        {showSettingsMenu && (
+          <div className="fixed inset-0 bg-black bg-opacity-30 z-50 flex items-center justify-center">
+            <div className="bg-white rounded-lg shadow-lg p-6 w-80">
+              <h2 className="text-lg font-semibold mb-4">Settings</h2>
+              <button className="w-full text-left py-2 px-3 hover:bg-gray-100 rounded" onClick={() => { setShowSupportedUsersModal(true); setShowSettingsMenu(false); }}>
+                Supported Users
+              </button>
+              <button className="w-full text-left py-2 px-3 hover:bg-gray-100 rounded mt-2" onClick={signOut}>
+                Sign Out
+              </button>
+              <button className="w-full text-left py-2 px-3 hover:bg-gray-100 rounded mt-2" onClick={() => setShowSettingsMenu(false)}>
+                Close
+              </button>
             </div>
-          )}
-        </aside>
+          </div>
+        )}
+        {/* Supported Users Modal */}
+        <SupportedUsersModal
+          open={showSupportedUsersModal}
+          supportedUsers={supportedUsers}
+          helperId={user.id}
+          helperName={user.name ?? undefined}
+          onClose={() => setShowSupportedUsersModal(false)}
+          onDelete={async (email) => {
+            if (!user?.id) return;
+            try {
+              const res = await fetch('/api/relationship', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ helper_id: user.id, parent_email: email }),
+              });
+              if (res.ok) {
+                setParentUsers((prev) => prev.filter((u) => u.email !== email));
+              } else {
+                // Optionally show error toast
+                setToastMsg('Failed to remove supported user');
+                setShowCancelToast(true);
+              }
+            } catch {
+              setToastMsg('Network error while removing supported user');
+              setShowCancelToast(true);
+            }
+          }}
+        />
+        <div className={styles.layout}>
+          {/* Modern Parent Selector */}
+          <div className={styles.parentSelectWrapper}>
+            <div className={styles.selectContainer}>
+              {(() => {
+                const parentOptions = [
+                  { id: '', label: 'Deselect', sublabel: 'Stop monitoring location' },
+                  ...parentUsers.map(parent => ({
+                    id: parent.id,
+                    label: parent.name,
+                    sublabel: parent.email,
+                    badge:
+                      selectedParent && selectedParent.id === parent.id && parentSharing[parent.id]
+                        ? 'Sharing'
+                        : undefined,
+                  }))
+                ];
+                return (
+                  <GenericSelector
+                    label="Your Supported Users"
+                    placeholder="Select a supported user..."
+                    options={parentOptions}
+                    value={selectedParent?.id || null}
+                    onChange={option => {
+                      if (option.id === '') {
+                        setSelectedParent(null);
+                      } else {
+                        const parent = parentUsers.find(p => p.id === option.id);
+                        if (parent) setSelectedParent({ id: parent.id, name: parent.name, email: parent.email } as User);
+                      }
+                    }}
+                    loading={parentLoading}
+                    loadingText="Loading parents..."
+                    emptyMessage="No parents connected yet. Ask them to add you as a helper."
+                  />
+                );
+              })()}
+            </div>
+          </div>
 
         {/* Main Content - Map and Details */}
         <main className={styles.mainContent}>
+          {/* Show SOS alert for any parent with active SOS (always visible) */}
+          {Object.entries(sosAlertsState).map(([pid, alert]) =>
+            alert?.is_active ? (
+              <div key={pid} className={styles.sosAlert}>
+                <div className={styles.sosAlertContent}>
+                  <span className={styles.sosIcon}>🚨</span>
+                  <div>
+                    <h3 className={styles.sosTitle}>
+                      EMERGENCY from {parentUsers.find(p => p.id === pid)?.name || 'Unknown'}
+                    </h3>
+                    <p className={styles.sosTime}>
+                      {alert.timestamp ? new Date(alert.timestamp).toLocaleString() : ''}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="success"
+                  size="medium"
+                  onClick={() => handleAcknowledgeSOS(alert.id)}
+                  disabled={!!acknowledging[alert.id]}
+                >
+                  {acknowledging[alert.id] ? 'Acknowledging...' : '✓ Acknowledge SOS'}
+                </Button>
+              </div>
+            ) : null
+          )}
+
           {selectedParentInfo ? (
             <>
-              {/* SOS Alert Banner */}
-              {selectedParentInfo.sosAlert?.is_active && (
-                <div className={styles.sosAlert}>
-                  <div className={styles.sosAlertContent}>
-                    <span className={styles.sosIcon}>🚨</span>
-                    <div>
-                      <h3 className={styles.sosTitle}>
-                        EMERGENCY from {selectedParentInfo.user.name}
-                      </h3>
-                      <p className={styles.sosTime}>
-                        {selectedParentInfo.sosAlert.timestamp ? new Date(selectedParentInfo.sosAlert.timestamp).toLocaleString() : ''}
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    variant="success"
-                    size="medium"
-                    onClick={() => handleAcknowledgeSOS(selectedParentInfo.sosAlert!.id)}
-                  >
-                    ✓ Acknowledge SOS
-                  </Button>
-                </div>
-              )}
-
               {/* Map */}
-              {selectedParentInfo.lastLocation ? (
+              {selectedParentInfo.isSharing && selectedParentInfo.lastLocation ? (
                 <div className={styles.mapContainer}>
                   <Map
                     center={[
@@ -332,13 +535,15 @@ export default function HelperPage() {
                   />
                 </div>
               ) : (
-                <Card>
-                  <div className={styles.noLocation}>
-                    <span className={styles.noLocationIcon}>📍</span>
-                    <h3>No Location Data</h3>
-                    <p>{selectedParentInfo.user.name} hasn't shared their location yet.</p>
-                  </div>
-                </Card>
+                parentLoading || !selectedParent ? null : (
+                  <Card>
+                    <div className={styles.noLocation}>
+                      <span className={styles.noLocationIcon}>📍</span>
+                      <h3>No Location Data</h3>
+                      <p>{selectedParentInfo.user.name} hasn't shared their location yet.</p>
+                    </div>
+                  </Card>
+                )
               )}
 
               {/* Location Details */}
@@ -371,14 +576,14 @@ export default function HelperPage() {
           ) : (
             <Card>
               <div className={styles.noSelection}>
-                <span className={styles.noSelectionIcon}>👈</span>
-                <h3>Select a Parent</h3>
-                <p>Choose a parent from the list to view their location</p>
+                <span className={styles.noSelectionIcon}>🧑‍🤝‍🧑</span>
+                <h3>Select a Supported User</h3>
+                <p>Choose a supported user from the list to view their location</p>
               </div>
             </Card>
           )}
         </main>
       </div>
-    </div>
-  );
+      </div>
+    );
 }

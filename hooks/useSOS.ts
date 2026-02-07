@@ -96,7 +96,7 @@ export function useSOS(userId: string) {
         });
       }
 
-      // Stop alarm
+      // Debug: check if audio exists
       if (state.audio) {
         state.audio.pause();
         state.audio.currentTime = 0;
@@ -116,6 +116,11 @@ export function useSOS(userId: string) {
       return true;
     } catch (error) {
       console.error('Error cancelling SOS:', error);
+      // Debug: check if audio exists
+      if (state.audio) {
+        state.audio.pause();
+        state.audio.currentTime = 0;
+      }
       return false;
     }
   }, [state.alertId, state.audio, userId]);

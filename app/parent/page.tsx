@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useLocationSharing } from '@/hooks/useGeolocation';
@@ -11,12 +11,14 @@ import Button from '@/components/Button/Button';
 import StatusIndicator from '@/components/StatusIndicator/StatusIndicator';
 import BatteryIndicator from '@/components/BatteryIndicator/BatteryIndicator';
 import Loading from '@/components/Loading/Loading';
+import Toast from '@/components/Toast/Toast';
 import styles from './parent.module.css';
 import { prisma } from '@/lib/prisma/client';
+import Navbar from '@/components/Navbar/Navbar';
+import SupportersModal from '@/components/SupportersModal/SupportersModal';
 
 export default function ParentPage() {
-  const [addHelperEmail, setAddHelperEmail] = useState("");
-  const [addHelperStatus, setAddHelperStatus] = useState<string | null>(null);
+  // ...existing code...
   const router = useRouter();
   const { user, loading: authLoading, signOut } = useAuth();
   const {
@@ -27,11 +29,15 @@ export default function ParentPage() {
     stopSharing,
   } = useLocationSharing();
   const { triggerSOS, cancelSOS } = useSOS(user?.id || '');
-  const { sosActive } = useSOSPolling(user?.id || '');
+  const { sosActive, alertId } = useSOSPolling(user?.id || '');
+  // Track if SOS was previously active
+  const [wasSOSActive, setWasSOSActive] = useState(false);
+  const [showCancelToast, setShowCancelToast] = useState(false);
   const { requestWakeLock, releaseWakeLock, isLocked: wakeLockActive } = useWakeLock();
   
   const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
   const [helperName, setHelperName] = useState<string>('your helper');
+  const [lastUpdateTime, setLastUpdateTime] = useState<string | null>(null);
 
   // Periodically send location to backend while sharing
   useEffect(() => {
@@ -77,6 +83,23 @@ export default function ParentPage() {
     }
   }, [user, authLoading, router]);
 
+  // Auto-cancel SOS if helper acknowledges
+  useEffect(() => {
+    if (wasSOSActive && alertId === null) {
+      // SOS was active, now cancelled by helper
+      cancelSOS();
+      stopSharing();
+      releaseWakeLock();
+      setShowCancelToast(true);
+      setWasSOSActive(false);
+    } else if (sosActive) {
+      setWasSOSActive(true);
+      // Alarm is managed by useSOS, no manual audio logic needed
+    } else {
+      // Alarm is managed by useSOS, no manual audio logic needed
+    }
+  }, [sosActive, alertId, wasSOSActive, cancelSOS, stopSharing, releaseWakeLock]);
+
   // Get battery level
   useEffect(() => {
     const getBatteryLevel = async () => {
@@ -113,6 +136,25 @@ export default function ParentPage() {
     };
     fetchHelperName();
   }, [user]);
+
+  // Fetch supporters from DB
+  useEffect(() => {
+    if (!user?.id) return;
+    const fetchSupporters = async () => {
+      try {
+        const res = await fetch(`/api/relationship/supporters?parent_id=${user.id}`);
+        const data = await res.json();
+        if (Array.isArray(data.supporters)) {
+          setHelpers(data.supporters);
+        }
+      } catch (err) {
+        console.error('Failed to fetch supporters:', err);
+      }
+    };
+    fetchSupporters();
+  }, [user?.id]);
+
+  const [helpers, setHelpers] = useState<string[]>([]);
 
   const handleStartSharing = useCallback(() => {
     if (!user || !user.id) return;
@@ -182,6 +224,51 @@ export default function ParentPage() {
     }
   }, [user, sosActive, cancelSOS, triggerSOS, isSharing, handleStartSharing, stopSharing, releaseWakeLock]);
 
+  useEffect(() => {
+    if (lastUpdate && typeof window !== 'undefined') {
+      setLastUpdateTime(new Date(lastUpdate.timestamp).toLocaleTimeString());
+    }
+  }, [lastUpdate]);
+
+  // Navbar settings modal state
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+  const [showHelpersModal, setShowHelpersModal] = useState(false);
+  const [showAddHelperModal, setShowAddHelperModal] = useState(false);
+
+  // Handler for settings icon
+  const handleSettingsClick = () => setShowSettingsMenu(true);
+  const handleCloseSettingsMenu = () => setShowSettingsMenu(false);
+
+  // Handler for helpers modal
+  const handleOpenHelpersModal = () => {
+    setShowHelpersModal(true);
+    setShowSettingsMenu(false);
+  };
+  const handleCloseHelpersModal = () => setShowHelpersModal(false);
+
+  // ...existing code...
+
+  // Delete supporter logic (API call)
+  const handleDeleteHelper = async (email: string) => {
+    if (!user || !user.id) return;
+    try {
+      const res = await fetch('/api/relationship', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ parent_id: user.id, helper_email: email }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        setHelpers(helpers.filter(h => h !== email));
+      } else {
+        // Optionally show error to user
+        console.error(result.error || 'Failed to delete supporter.');
+      }
+    } catch (err) {
+      console.error('Network or server error while deleting supporter.', err);
+    }
+  };
+
   if (authLoading) {
     return <Loading size="large" text="Loading..." />;
   }
@@ -191,95 +278,83 @@ export default function ParentPage() {
   }
 
   return (
-    <div className={styles.container}>
-      {/* Add Helper UI */}
-      <section className={styles.addHelperSection}>
-        <h2>Add a Helper</h2>
-        <form
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setAddHelperStatus(null);
-            if (!addHelperEmail) return setAddHelperStatus("Please enter an email.");
-            try {
-              const res = await fetch("/api/relationship/add", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ parent_id: user.id, helper_email: addHelperEmail }),
-              });
-              const result = await res.json();
-              if (result.success) {
-                setAddHelperStatus("✅ Helper added successfully!");
-                setAddHelperEmail("");
-              } else {
-                switch (res.status) {
-                  case 400:
-                    setAddHelperStatus("❌ Missing parent ID or helper email.");
-                    break;
-                  case 404:
-                    setAddHelperStatus("❌ Helper not found or not a helper. Please check the email and role.");
-                    break;
-                  case 409:
-                    setAddHelperStatus("⚠️ Relationship already exists.");
-                    break;
-                  default:
-                    setAddHelperStatus(result.error ? `❌ ${result.error}` : "❌ Failed to add helper.");
-                }
-              }
-            } catch (err) {
-              setAddHelperStatus("❌ Network or server error while adding helper.");
-            }
-          }}
-        >
-          <input
-            type="email"
-            placeholder="Helper's email"
-            value={addHelperEmail}
-            onChange={(e) => setAddHelperEmail(e.target.value)}
-            required
-            className={styles.input}
-          />
-          <Button type="submit" variant="primary" size="medium">
-            Add Helper
-          </Button>
-        </form>
-        {addHelperStatus && <p className={styles.statusMsg}>{addHelperStatus}</p>}
-      </section>
-      <header className={styles.header}>
-        <div className={styles.headerTop}>
-          <h1 className={styles.title}>Najik</h1>
-          <button type="button" onClick={() => signOut()} className={styles.signOutButton}>
-            Sign Out
-          </button>
+    <div className="pt-16">
+      <Navbar
+        onSettingsClick={handleSettingsClick}
+        title="Najik"
+        onSignOut={signOut}
+        userName={user.name ?? undefined}
+      />
+      {/* Settings Menu Modal */}
+      {showSettingsMenu && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-80">
+            <h2 className="text-lg font-semibold mb-4">Settings</h2>
+            <button className="w-full text-left py-2 px-3 hover:bg-gray-100 rounded" onClick={handleOpenHelpersModal}>
+              Supporters
+            </button>
+            <button className="w-full text-left py-2 px-3 hover:bg-gray-100 rounded mt-2" onClick={signOut}>
+              Sign Out
+            </button>
+            <button className="w-full text-left py-2 px-3 hover:bg-gray-100 rounded mt-2" onClick={handleCloseSettingsMenu}>
+              Close
+            </button>
+          </div>
         </div>
-        <p className={styles.subtitle}>Hello, {user?.name}!</p>
-      </header>
-
+      )}
+      {/* Supporters Modal */}
+      <SupportersModal
+        open={showHelpersModal}
+        supporters={helpers}
+        parentId={user?.id}
+        onDelete={handleDeleteHelper}
+        onClose={handleCloseHelpersModal}
+        setHelpers={setHelpers}
+      />
       <main className={styles.main}>
         {/* Status Display */}
         <div className={styles.statusCard}>
-          {isSharing && (
-            <StatusIndicator
-              status="sharing"
-              text={`Sharing with ${helperName}`}
-              pulse
-            />
-          )}
-          {sosActive && (
-            <StatusIndicator
-              status="sos"
-              text="🚨 SOS ACTIVE - Help is notified"
-              pulse
-            />
-          )}
-          {!isSharing && !sosActive && (
-            <StatusIndicator status="offline" text="Not sharing location" />
-          )}
-          
-          {batteryLevel !== null && (
-            <div className={styles.batteryContainer}>
-              <BatteryIndicator level={batteryLevel} size="large" />
-            </div>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'space-between', width: '100%', padding: '2px 0', minHeight: 0 }}>
+            {isSharing ? (
+              <StatusIndicator
+                status="sharing"
+                text={
+                  helpers.length > 1
+                    ? `Sharing with ${helpers.length} helpers`
+                    : `Sharing with ${helperName}`
+                }
+                pulse
+              />
+            ) : sosActive ? (
+              <StatusIndicator
+                status="sos"
+                text="🚨 SOS ACTIVE - Help is notified"
+                pulse
+              />
+            ) : (
+              <StatusIndicator status="offline" text="Not sharing location" />
+            )}
+            {batteryLevel !== null && (
+              <span style={{
+                marginLeft: 8,
+                display: 'inline-flex',
+                alignItems: 'center',
+                background: 'var(--color-card-bg, #f3f4f6)',
+                borderRadius: '999px',
+                padding: '4px 14px',
+                fontSize: '1.25em', // Increased font size
+                fontWeight: 600,
+                color: '#374151',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                border: '1px solid #e5e7eb',
+                minWidth: 0
+              }}>
+                <span style={{ display: 'flex', alignItems: 'center', fontSize: '1.5em', marginRight: 6 }}>
+                  <BatteryIndicator level={batteryLevel} size="large" />
+                </span>
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Error Display */}
@@ -364,10 +439,10 @@ export default function ParentPage() {
           </div>
         )}
 
-        {lastUpdate && (
+        {lastUpdate && lastUpdateTime && (
           <div className={styles.infoBox}>
             <span>✓</span>
-            <span>Last updated: {new Date(lastUpdate.timestamp).toLocaleTimeString()}</span>
+            <span>Last updated: {lastUpdateTime}</span>
           </div>
         )}
       </main>

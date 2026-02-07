@@ -38,8 +38,27 @@ export default function RegisterPage() {
       });
       if (signInRes?.error) throw new Error(signInRes.error);
 
-      // Redirect based on role
-      router.push(role === 'parent' ? '/parent' : '/helper');
+      // Fetch user role from session and redirect accordingly
+      // Wait for session to update after signIn
+      let tries = 0;
+      let userRole = null;
+      while (tries < 10 && !userRole) {
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise((res) => setTimeout(res, 200));
+        try {
+          const sessionRes = await fetch('/api/auth/session');
+          const sessionData = await sessionRes.json();
+          userRole = sessionData?.user?.role;
+        } catch {}
+        tries++;
+      }
+      if (userRole === 'parent') {
+        router.push('/parent');
+      } else if (userRole === 'helper') {
+        router.push('/helper');
+      } else {
+        router.push('/');
+      }
     } catch (err: any) {
       setError(err.message || 'An error occurred during registration');
     } finally {

@@ -26,11 +26,27 @@ export default function LoginPage() {
       });
       if (res?.error) throw new Error(res.error);
 
-      // Fetch user role from session (optional: you can also fetch from API)
-      // For now, just redirect to /parent or /helper based on a placeholder
-      // You may want to fetch user info from /api/user or use useSession
-      // For now, redirect to /parent
-      router.push('/parent');
+      // Fetch user role from session and redirect accordingly
+      // Wait for session to update after signIn
+      let tries = 0;
+      let userRole = null;
+      while (tries < 10 && !userRole) {
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise((res) => setTimeout(res, 200));
+        try {
+          const sessionRes = await fetch('/api/auth/session');
+          const sessionData = await sessionRes.json();
+          userRole = sessionData?.user?.role;
+        } catch {}
+        tries++;
+      }
+      if (userRole === 'parent') {
+        router.push('/parent');
+      } else if (userRole === 'helper') {
+        router.push('/helper');
+      } else {
+        router.push('/');
+      }
     } catch (err: any) {
       setError(err.message || 'Invalid email or password');
     } finally {
