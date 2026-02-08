@@ -1,0 +1,337 @@
+1. Firebase Setup & Configuration
+First, create these files:
+lib/firebase/config.ts
+typescriptimport { initializeApp, getApps, FirebaseApp } from 'firebase/app';
+import { getMessaging, Messaging, isSupported } from 'firebase/messaging';
+
+const firebaseConfig = {
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+};
+
+let app: FirebaseApp;
+let messaging: Messaging | null = null;
+
+export function getFirebaseApp() {
+  if (!getApps().length) {
+    app = initializeApp(firebaseConfig);
+  } else {
+    app = getApps()[0];
+  }
+  return app;
+}
+
+export async function getFirebaseMessaging() {
+  if (typeof window === 'undefined') return null;
+  
+  const supported = await isSupported();
+  if (!supported) {
+    console.warn('Firebase Messaging is not supported in this browser');
+    return null;
+  }
+
+  if (!messaging) {
+    const app = getFirebaseApp();
+    messaging = getMessaging(app);
+  }
+  return messaging;
+}
+.env.local
+bash# Firebase Config
+NEXT_PUBLIC_FIREBASE_API_KEY=your_api_key_here
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-project-id
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your-project.appspot.com
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=123456789
+NEXT_PUBLIC_FIREBASE_APP_ID=1:123456789:web:abcdef
+NEXT_PUBLIC_FIREBASE_VAPID_KEY=your_vapid_key_here
+
+# Server-side Firebase Admin (for sending notifications)
+FIREBASE_ADMIN_PROJECT_ID=your-project-id
+FIREBASE_ADMIN_CLIENT_EMAIL=firebase-adminsdk@your-project.iam.gserviceaccount.com
+FIREBASE_ADMIN_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+2. Service Worker for Background Notifications
+public/firebase-messaging-sw.js
+javascript// Import Firebase scripts (CDN for service worker)
+importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js');
+
+// Initialize Firebase in the service worker
+firebase.initializeApp({
+  apiKey: "your_api_key_here",
+  authDomain: "your-project.firebaseapp.com",
+  projectId: "your-project-id",
+  storageBucket: "your-project.appspot.com",
+  messagingSenderId: "123456789",
+  appId: "1:123456789:web:abcdef"
+});
+
+const messaging = firebase.messaging();
+
+// Handle background messages
+messaging.onBackgroundMessage((payload) => {
+  console.log('[firebase-messaging-sw.js] Received background message:', payload);
+  
+  const notificationTitle = payload.notification?.title || 'Najik';
+  const notificationOptions = {
+    body: payload.notification?.body || 'You have a new notification',
+    icon: '/images/logos/icon-192x192.png',
+    badge: '/images/logos/badge-72x72.png',
+    tag: payload.data?.type || 'default',
+    requireInteraction: payload.data?.type === 'sos_alert',
+    data: payload.data,
+    actions: payload.data?.type === 'sos_alert' ? [
+      { action: 'view', title: 'View Location' },
+      { action: 'acknowledge', title: 'Acknowledge' }
+    ] : undefined,
+  };
+
+  self.registration.showNotification(notificationTitle, notificationOptions);
+});
+
+// Handle notification clicks
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  
+  const urlToOpen = event.notification.data?.url || '/helper';
+  
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clientList) => {
+        // If app is already open, focus it
+        for (const client of clientList) {
+          if (client.url === urlToOpen && 'focus' in client) {
+            return client.focus();
+          }
+        }
+        // Otherwise open new window
+        if (clients.openWindow) {
+          return clients.openWindow(urlToOpen);
+        }
+      })
+  );
+});
+3. Update Your Helper Page
+app/helper/page.tsx - Add notification request on mount:
+typescript'use client';
+
+import { usePushNotifications } from '@/hooks/usePushNotifications';
+
+export default function HelperPage() {
+  const { user, loading: authLoading, signOut } = useAuth();
+  const { 
+    permission, 
+    token, 
+    error: notifError, 
+    requestPermission 
+  } = usePushNotifications(user?.id);
+
+  // ... your existing state
+
+  // Request notification permission on first load
+  useEffect(() => {
+    if (user && permission === 'default') {
+      // Show a nice modal first (optional)
+      setShowNotificationPrompt(true);
+    }
+  }, [user, permission]);
+
+  const handleEnableNotifications = async () => {
+    const granted = await requestPermission();
+    if (granted) {
+      setToastMsg('✅ Notifications enabled! You\'ll receive SOS alerts.');
+      setShowCancelToast(true);
+    } else {
+      setToastMsg('❌ Please enable notifications to receive emergency alerts.');
+      setShowCancelToast(true);
+    }
+    setShowNotificationPrompt(false);
+  };
+
+  // ... rest of your component
+}
+4. API Route to Save FCM Tokens
+app/api/fcm-token/route.ts
+typescriptimport { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma/client';
+
+export async function POST(req: NextRequest) {
+  try {
+    const { userId, token } = await req.json();
+
+    if (!userId || !token) {
+      return NextResponse.json(
+        { error: 'Missing userId or token' },
+        { status: 400 }
+      );
+    }
+
+    // Update user's FCM token
+    await prisma.users.update({
+      where: { id: userId },
+      data: { fcm_token: token },
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error saving FCM token:', error);
+    return NextResponse.json(
+      { error: 'Failed to save token' },
+      { status: 500 }
+      );
+  }
+}
+5. Update usePushNotifications Hook
+Update the token saving part:
+typescriptconst getNotificationToken = async () => {
+  try {
+    const messaging = await getFirebaseMessaging();
+    if (!messaging) {
+      throw new Error('Firebase Messaging not available');
+    }
+
+    const currentToken = await getToken(messaging, { vapidKey: VAPID_KEY });
+    
+    if (currentToken) {
+      setToken(currentToken);
+      
+      // Save token to database
+      if (userId) {
+        await fetch('/api/fcm-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, token: currentToken }),
+        });
+      }
+      
+      return currentToken;
+    } else {
+      console.warn('No registration token available');
+      return null;
+    }
+  } catch (err: any) {
+    console.error('Error getting notification token:', err);
+    setError(err.message);
+    return null;
+  }
+};
+6. Send Notifications from Backend
+lib/firebase/admin.ts (Server-side)
+typescriptimport * as admin from 'firebase-admin';
+
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert({
+      projectId: process.env.FIREBASE_ADMIN_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+    }),
+  });
+}
+
+export async function sendPushNotification(
+  fcmToken: string,
+  title: string,
+  body: string,
+  data?: Record<string, string>
+) {
+  try {
+    const message = {
+      notification: { title, body },
+      data: data || {},
+      token: fcmToken,
+      android: {
+        priority: 'high' as const,
+        notification: {
+          sound: 'default',
+          channelId: 'sos_alerts',
+        },
+      },
+      apns: {
+        payload: {
+          aps: {
+            sound: 'default',
+            badge: 1,
+          },
+        },
+      },
+    };
+
+    const response = await admin.messaging().send(message);
+    console.log('Successfully sent message:', response);
+    return { success: true, messageId: response };
+  } catch (error) {
+    console.error('Error sending message:', error);
+    return { success: false, error };
+  }
+}
+7. Update SOS Trigger to Send Push
+app/api/sos/route.ts (or wherever you handle SOS)
+typescriptimport { sendPushNotification } from '@/lib/firebase/admin';
+import { prisma } from '@/lib/prisma/client';
+
+export async function POST(req: Request) {
+  const { user_id, latitude, longitude } = await req.json();
+
+  // Create SOS alert in database
+  const sosAlert = await prisma.sos_alerts.create({
+    data: {
+      user_id,
+      latitude,
+      longitude,
+      is_active: true,
+      timestamp: new Date(),
+    },
+  });
+
+  // Get all helpers for this parent
+  const relationships = await prisma.relationships.findMany({
+    where: { parent_id: user_id },
+    include: { helper: true },
+  });
+
+  // Send push notification to all helpers
+  for (const rel of relationships) {
+    if (rel.helper.fcm_token) {
+      await sendPushNotification(
+        rel.helper.fcm_token,
+        '🚨 EMERGENCY ALERT',
+        `${rel.parent.name} needs help immediately!`,
+        {
+          type: 'sos_alert',
+          parentId: user_id,
+          latitude: latitude.toString(),
+          longitude: longitude.toString(),
+          url: '/helper',
+        }
+      );
+    }
+  }
+
+  return Response.json({ success: true, alertId: sosAlert.id });
+}
+8. Update Database Schema
+Add fcm_token to users table:
+prismamodel users {
+  id         String   @id @default(uuid())
+  email      String   @unique
+  name       String?
+  role       String?
+  fcm_token  String?  // Add this field
+  password   String?
+  created_at DateTime @default(now())
+}
+Run migration:
+bashnpx prisma migrate dev --name add_fcm_token
+Testing
+
+Deploy to Vercel (push notifications require HTTPS)
+Open helper page → grant notification permission
+Trigger SOS from parent page
+You should get notification even if app is closed!
+
+This setup gives you full native-like push notifications for SOS alerts! 🚀

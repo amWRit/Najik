@@ -69,12 +69,14 @@ export function usePushNotifications(userId?: string) {
       
       if (currentToken) {
         setToken(currentToken);
-        
         // Save token to database
         if (userId) {
-          // Save token to database using Prisma/REST API instead of supabase
+          await fetch('/api/fcm-token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, token: currentToken }),
+          });
         }
-        
         return currentToken;
       } else {
         console.warn('No registration token available');

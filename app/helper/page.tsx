@@ -6,6 +6,7 @@ import { useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useRealtimeSubscription } from '@/hooks/useRealtime';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { LocationUpdate, SOSAlert, User } from '@/lib/types/database.types';
 
 import Button from '@/components/Button/Button';
@@ -41,6 +42,35 @@ export default function HelperPage() {
     const [showSettingsMenu, setShowSettingsMenu] = useState(false);
     // Supported users modal state
     const [showSupportedUsersModal, setShowSupportedUsersModal] = useState(false);
+    // Authentication hook (add this before push notification integration)
+    const { user, signOut, loading } = useAuth();
+
+    // Push notification integration
+    const {
+      permission,
+      token,
+      error: notifError,
+      requestPermission
+    } = usePushNotifications(user?.id);
+    // Notification prompt modal state
+    const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
+    // Request notification permission on first load
+    useEffect(() => {
+      if (user && permission === 'default') {
+        setShowNotificationPrompt(true);
+      }
+    }, [user, permission]);
+    const handleEnableNotifications = async () => {
+      const granted = await requestPermission();
+      if (granted) {
+        setToastMsg('✅ Notifications enabled! You\'ll receive SOS alerts.');
+        setShowCancelToast(true);
+      } else {
+        setToastMsg('❌ Please enable notifications to receive emergency alerts.');
+        setShowCancelToast(true);
+      }
+      setShowNotificationPrompt(false);
+    };
     // Unlock audio context on first user interaction
     useEffect(() => {
       let ctx: AudioContext | null = null;
@@ -187,7 +217,6 @@ export default function HelperPage() {
       };
     }, [parentUsers]);
   const router = useRouter();
-  const { user, loading: authLoading, signOut } = useAuth();
   const [parents, setParents] = useState<ParentStatus[]>([]);
   const [parentLoading, setParentLoading] = useState(true);
 
@@ -206,7 +235,7 @@ export default function HelperPage() {
 
   // Check authentication and role
   useEffect(() => {
-    if (!authLoading && !user) {
+    if (!loading && !user) {
       router.push('/auth/login');
     } else if (user && user.role === 'helper') {
       // Stay on helper page
@@ -217,7 +246,7 @@ export default function HelperPage() {
       signOut();
       router.push('/auth/login');
     }
-  }, [user, authLoading, router]);
+  }, [user, loading, router]);
 
   // Fetch latest location update for each parent to determine sharing status
   useEffect(() => {
@@ -276,7 +305,7 @@ export default function HelperPage() {
   
   // Fetch parents and their status
   useEffect(() => {
-    if (authLoading) return;
+    if (loading) return;
     if (!user || !user.id || user.role !== 'helper') return;
     setParentLoading(true);
     fetch(`/api/relationship/parents?helper_id=${user.id}`)
@@ -290,7 +319,7 @@ export default function HelperPage() {
         setParentLoading(false);
       });
     // Only run when user.id or user.role changes
-  }, [authLoading, user?.id, user?.role]);
+  }, [loading, user?.id, user?.role]);
 
   // Auto-select parent if SOS alert
   useEffect(() => {
@@ -371,7 +400,21 @@ export default function HelperPage() {
     return () => window.removeEventListener('mousedown', handle);
   }, [showParentMenu]);
 
-  if (authLoading) {
+  if (loading) {
+    if (showNotificationPrompt) {
+      return (
+        <Modal isOpen={showNotificationPrompt} onClose={() => setShowNotificationPrompt(false)} title="Enable Notifications?">
+          <div className="flex flex-col items-center justify-center gap-4">
+            <p className="text-base text-gray-700">To receive real-time SOS alerts, please enable push notifications.</p>
+            <Button size="medium" variant="primary" onClick={handleEnableNotifications} className="px-6 py-2 rounded-full flex items-center gap-2 shadow-md">
+              <span>Enable Notifications</span>
+              <span aria-hidden="true">🔔</span>
+            </Button>
+            {notifError && <p className="text-red-500 text-sm mt-2">{notifError}</p>}
+          </div>
+        </Modal>
+      );
+    }
     return <Loading size="large" text="Loading dashboard..." />;
   }
 
