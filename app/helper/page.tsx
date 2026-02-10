@@ -424,6 +424,15 @@ export default function HelperPage() {
 
     return (
       <div className={styles.container}>
+        {/* Show a visible enable notifications banner if not granted */}
+        {permission !== 'granted' && (
+          <div style={{position: 'fixed', top: 0, left: 0, width: '100%', background: '#FEF3C7', color: '#92400E', padding: '12px 0', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+            <span style={{marginRight: 16}}>Push notifications are not enabled.</span>
+            <Button size="medium" variant="primary" onClick={handleEnableNotifications}>
+              Enable Notifications
+            </Button>
+          </div>
+        )}
         {/* Toast for SOS cancel/acknowledge */}
         {showCancelToast && (
           <Toast message={toastMsg} onClose={() => setShowCancelToast(false)} />

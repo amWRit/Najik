@@ -26,6 +26,10 @@ firebase-service-account.json
 # misc
 .DS_Store
 *.pem
+cert/
+mkcert.exe
+package.devhttps.json
+scripts/generate-ssl.js
 
 # debug
 npm-debug.log*
