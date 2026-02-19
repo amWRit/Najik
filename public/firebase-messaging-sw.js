@@ -4,13 +4,15 @@ importScripts('https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js'
 importScripts('https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js');
 
 // Initialize the Firebase app in the service worker
+// NOTE: Service workers cannot access process.env directly.
+// For local dev, inject values at build time or use template literals.
 firebase.initializeApp({
-  apiKey: 'YOUR_API_KEY',
-  authDomain: 'YOUR_AUTH_DOMAIN',
-  projectId: 'YOUR_PROJECT_ID',
-  storageBucket: 'YOUR_STORAGE_BUCKET',
-  messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
-  appId: 'YOUR_APP_ID',
+  apiKey: 'AIzaSyD985mMzDhEm2xOCqa5LQyutzhfjzIBw9Q',
+  authDomain: 'najik-68f4d.firebaseapp.com',
+  projectId: 'najik-68f4d',
+  storageBucket: 'najik-68f4d.firebasestorage.app',
+  messagingSenderId: '600093110199',
+  appId: '1:600093110199:web:6daba0d9bded4e0c9ec232',
 });
 
 // Retrieve an instance of Firebase Messaging

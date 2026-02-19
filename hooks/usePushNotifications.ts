@@ -66,22 +66,30 @@ export function usePushNotifications(userId?: string) {
       }
 
       const currentToken = await getToken(messaging, { vapidKey: VAPID_KEY });
+      console.log('[Najik] FCM token generated:', currentToken);
       
       if (currentToken) {
         setToken(currentToken);
-        
         // Save token to database
         if (userId) {
-          // Save token to database using Prisma/REST API instead of supabase
+          console.log('[Najik] Sending FCM token to backend:', { userId, token: currentToken });
+          const res = await fetch('/api/fcm-token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, token: currentToken }),
+          });
+          const data = await res.json();
+          console.log('[Najik] Backend /api/fcm-token response:', data);
+        } else {
+          console.warn('[Najik] No userId provided, not sending FCM token to backend');
         }
-        
         return currentToken;
       } else {
-        console.warn('No registration token available');
+        console.warn('[Najik] No registration token available');
         return null;
       }
     } catch (err: any) {
-      console.error('Error getting notification token:', err);
+      console.error('[Najik] Error getting notification token:', err);
       setError(err.message);
       return null;
     }
